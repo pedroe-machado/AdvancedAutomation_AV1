@@ -1,5 +1,9 @@
 package io.sim;
 
+import java.io.IOException;
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+
 import de.tudresden.sumo.cmd.Vehicle;
 import java.util.ArrayList;
 
@@ -126,13 +130,11 @@ public class Auto extends Thread {
 				//		+ "Y=" + this.drivingRepport.get(this.drivingRepport.size() - 1).getY_Position());
 				System.out.println("speed = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getSpeed());
 				System.out.println("odometer = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getOdometer());
-				System.out.println("Fuel Consumption = "
-						+ this.drivingRepport.get(this.drivingRepport.size() - 1).getFuelConsumption());
+				System.out.println("Fuel Consumption = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getFuelConsumption());
 				//System.out.println("Fuel Type = " + this.fuelType);
 				//System.out.println("Fuel Price = " + this.fuelPrice);
 
-				System.out.println(
-						"CO2 Emission = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getCo2Emission());
+				System.out.println("CO2 Emission = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getCo2Emission());
 
 				//System.out.println();
 				//System.out.println("************************");
@@ -173,6 +175,12 @@ public class Auto extends Thread {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+
+	synchronized private void exportaTxt(String linha) throws IOException{
+		BufferedWriter buffWrite = new BufferedWriter(new FileWriter("\\Users\\Usuario\\OneDrive\\Documentos\\Cursos\\Ufla\\11 periodo\\Sistemas Distribuídos\\report.txt", true));
+		buffWrite.append(linha + "\n");
+		buffWrite.close();
 	}
 
 	public boolean isOn_off() {

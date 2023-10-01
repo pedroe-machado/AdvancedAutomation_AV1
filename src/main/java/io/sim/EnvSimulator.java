@@ -27,7 +27,7 @@ public class EnvSimulator extends Thread{
 		try {
 			sumo.runServer(12345);
 
-			Itinerary i1 = new Itinerary("data/dados2.xml", "0");
+			Itinerary i1 = new Itinerary("data/dados.xml", "0");
 
 			if (i1.isOn()) {
 
