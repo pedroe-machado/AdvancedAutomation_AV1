@@ -22,11 +22,13 @@ public class Itinerary {
 	public Itinerary(String _uriRoutesXML, String _idRoute) {
 		this.uriItineraryXML = _uriRoutesXML;
 		this.idItinerary = _idRoute;
+
 		try {
 			DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
 			DocumentBuilder builder = factory.newDocumentBuilder();
 			Document doc = builder.parse(this.uriItineraryXML);
 			NodeList nList = doc.getElementsByTagName("vehicle");
+			
 			for (int i = 0; i < nList.getLength(); i++) {
 				Node nNode = nList.item(i);
 				if (nNode.getNodeType() == Node.ELEMENT_NODE) {

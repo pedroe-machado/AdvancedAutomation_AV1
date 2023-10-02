@@ -19,7 +19,7 @@ public class Cliente extends Thread {
         this.jsonObject = jsonObject;
     }
 
-    @Override
+	@Override
     public void run() {
         try {
             OutputStream output = socket.getOutputStream();
