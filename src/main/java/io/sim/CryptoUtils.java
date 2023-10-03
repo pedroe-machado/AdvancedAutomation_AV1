@@ -2,7 +2,6 @@ package io.sim;
 
 import javax.crypto.*;
 import javax.crypto.spec.*;
-import java.security.*;
 
 public class CryptoUtils {
 
@@ -36,6 +35,6 @@ public class CryptoUtils {
         cipher.init(Cipher.DECRYPT_MODE, secretKey, ivSpec);
         return cipher.doFinal(input);
     }
-    
+
 }
 

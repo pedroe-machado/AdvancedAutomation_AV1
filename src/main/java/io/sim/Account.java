@@ -1,10 +1,11 @@
 package io.sim;
 
-public class Account implements Runnable{
+public class Account{
     
     private String idConta;
     private String senha;
     private double saldo;
+    private boolean autenticado;
 
     public Account(String idConta, double saldo){
         this.idConta = this.senha = idConta;
@@ -23,20 +24,16 @@ public class Account implements Runnable{
         saldo += valor;
     }
 
-    public void transfere(String _idConta, String _senha, double valor){
-        if(autentica(_idConta, _senha)) saldo -= valor;
+    public void debita(double valor){
+        if(autenticado) saldo -= valor;
         else System.out.println("erro de autenticacao");
     }
 
-    private boolean autentica(String _idConta, String _senha){
-        if(_idConta.equalsIgnoreCase(idConta) && _senha.equalsIgnoreCase(senha)){
+    public boolean autenticar(String _senha){
+        if( _senha.equalsIgnoreCase(senha)){
+            autenticado = true;
             return true;
         }
         return false;
-    }
-
-    @Override
-    public void run() {
-        throw new UnsupportedOperationException("Unimplemented method 'run'");
     }
 }

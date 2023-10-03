@@ -8,10 +8,13 @@ public class Car extends Vehicle implements Runnable{
 
     private float fuelTank;
     private Route currentRoute;
+    private boolean on_off;
 
     @Override
     public void run() {
-        
+        while(this.on_off){
+
+        }
     }
 
     

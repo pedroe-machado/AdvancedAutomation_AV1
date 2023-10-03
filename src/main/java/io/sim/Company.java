@@ -3,6 +3,9 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
@@ -11,7 +14,9 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
+import org.apache.logging.log4j.core.jmx.Server;
 import org.json.simple.*;
+import org.json.simple.parser.JSONParser;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -24,10 +29,10 @@ public class Company implements Runnable {
     private ArrayList<Route> avaliableRoutes;
     private ArrayList<Route> runningRoutes;
     private ArrayList<Route> finishedRoutes;
-    public Servidor serverCar;
 
     public Company(){
-        reconstructOriginalFile();
+        reconstructOriginalFile(); //testar se xml já foi limpo
+        new Thread(this).start();
     }
 
     @Override
@@ -41,7 +46,6 @@ public class Company implements Runnable {
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-
         
         while(true){
 
@@ -56,7 +60,7 @@ public class Company implements Runnable {
     }
 
     // Gera rotas e processa arquivos raiz
-    class CreateRoutes extends Thread{
+    private class CreateRoutes extends Thread{
         private ArrayList<Route> routes;
 
         @Override
@@ -133,17 +137,19 @@ public class Company implements Runnable {
             File originalFile = new File(uriRoutesXML);
             File tempFile = new File("\\data\\temp.xml");
     
-            if (tempFile.renameTo(originalFile)) {
+            if(tempFile.exists()){
+                if (tempFile.renameTo(originalFile)) {
                 System.out.println("Arquivo reconstruído com sucesso.");
-                
-                // Exclui o arquivo temporário
+                    
+                    // Exclui o arquivo temporário
                 if (tempFile.delete()) {
                     System.out.println("Arquivo temporário excluído com sucesso.");
                 } else {
                     System.out.println("Falha ao excluir o arquivo temporário.");
                 }
-            } else {
-                System.out.println("Falha ao reconstruir o arquivo.");
+                } else {
+                    System.out.println("Falha ao reconstruir o arquivo.");
+                }
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -151,32 +157,126 @@ public class Company implements Runnable {
         }
     }
     
-    // Conecta carros
+    /*
+     * Thread que implementa o servidor da empresa. 
+     * cada solicitação de serviço é tratada em uma nova thread
+    */
+    private class CompanyServer extends Thread{
 
-    //
+        private ServerSocket serverSocket;
 
-    // Pagamentos 
-    public void pagaMotorista(String idDriver, double valor) throws UnknownHostException, IOException{
-        
-        Socket socketBanco = new Socket("127.0.0.1", 15000);
-        
-        JSONObject jsonObject = new JSONObject();
-        jsonObject.put("driver", idDriver);
-        jsonObject.put("valor", valor);
-
-        new BotPayment(socketBanco, jsonObject);
-    }
-
-    private class BotPayment extends Cliente implements Runnable{
-
-        public BotPayment(Socket socketBanco, JSONObject jsonObject){
-            super(socketBanco,CryptoUtils.getStaticKey(),CryptoUtils.getStaticIV(), jsonObject);
-            new Thread(this).start();
+        public CompanyServer() throws UnknownHostException, IOException{
+            serverSocket = new ServerSocket(20181);
         }
 
         @Override
         public void run() {
-            super.run();
+            while (true) {
+                try {
+                    Socket clientSocket = serverSocket.accept(); // Aceita uma nova conexão
+                    new ClientHandler(clientSocket).start(); // Inicia uma nova thread para lidar com o cliente
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    private class ClientHandler extends Thread {
+        private Socket clientSocket;
+
+        public ClientHandler(Socket clientSocket) {
+            this.clientSocket = clientSocket;
+        }
+
+        @Override
+        public void run() {
+            try {
+                InputStream input = clientSocket.getInputStream();
+                byte[] encryptedData = input.readAllBytes();
+
+                // Descriptografa os dados
+                byte[] decryptedData = CryptoUtils.decrypt(CryptoUtils.getStaticKey(), CryptoUtils.getStaticIV(),encryptedData);
+
+                JSONParser parser = new JSONParser();
+                Object obj = parser.parse(new String(decryptedData));
+                JSONObject jsonObject = (JSONObject) obj;
+
+                if (jsonObject.get("servico").equals("REQUEST_ROUTE")) {
+                    // new route handler thread
+                } else if (jsonObject.get("servico").equals("SEND_INFO")) {
+                    // new calculaKm thread
+                }
+                input.close();
+                clientSocket.close();
+
+                Thread.sleep(0, 100);
+            } catch (IOException e) {
+                e.printStackTrace();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    //
+    private class AtribuiRota extends Thread{
+        
+        JSONObject jsonObject;
+        public AtribuiRota(JSONObject jsonObject){
+            this.jsonObject = jsonObject;
+        }
+
+        @Override
+        public void run(){
+
+        }
+    }
+
+    private class CalculaKm extends Thread{
+        
+        JSONObject jsonObject;
+        public CalculaKm(JSONObject jsonObject){
+            this.jsonObject = jsonObject;
+        }
+
+        @Override
+        public void run(){
+            
+        }
+    }
+
+    private class BotPayment extends Thread {
+
+        private Socket socket;
+        private JSONObject jsonObject;
+
+        public BotPayment(String idDriver) throws UnknownHostException, IOException{
+            this.socket = new Socket("127.0.0.1", 20180);
+            this.jsonObject = new JSONObject();
+            this.jsonObject.put("driver", idDriver);
+            this.jsonObject.put("servico", 3.25);
+        }
+
+        @Override
+        public void run() {
+            try {
+                OutputStream output = socket.getOutputStream();
+
+                // Converte o JSON em bytes
+                byte[] jsonBytes = jsonObject.toJSONString().getBytes();
+
+                // Criptografa os dados
+                byte[] encryptedData = CryptoUtils.encrypt(CryptoUtils.getStaticKey(), CryptoUtils.getStaticIV(), jsonBytes);
+
+                // Envia os dados criptografados para o servidor
+                output.write(encryptedData);
+
+                output.close();
+                socket.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
     }
     

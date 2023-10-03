@@ -3,7 +3,6 @@ package io.sim;
 import java.io.*;
 import java.net.*;
 import org.json.simple.*;
-import java.security.*;
 
 public class Cliente extends Thread {
 

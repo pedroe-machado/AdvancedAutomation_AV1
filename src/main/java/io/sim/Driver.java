@@ -16,15 +16,19 @@ public class Driver implements Runnable{
     private ArrayList<Route> toDo;
     private ArrayList<Route> done;
 
+    public Driver(){
+
+        new Thread(this).start();
+    }
+
     @Override
     public void run() {
 
     }
     
-    
     private class BotPayment implements Runnable{
         
-        
+
         JSONObject jsonObject = new JSONObject();
 
         @Override
