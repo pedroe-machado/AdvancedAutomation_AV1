@@ -20,7 +20,7 @@ public class AlphaBank implements Runnable{
         contas = new HashMap<>();
         serverSocket = new ServerSocket(20180);
     }
-    
+
     @Override
     public void run() {
         while (true) {

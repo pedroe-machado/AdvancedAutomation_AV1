@@ -6,9 +6,9 @@ import de.tudresden.sumo.util.SumoCommand;
 
 public class Route {
     private String id;
-    private ArrayList<String> edges;
+    private SumoStringList edges;
 
-    public Route(String id, ArrayList<String> edges) {
+    public Route(String id, SumoStringList edges) {
         this.id = id;
         this.edges = edges;
     }
@@ -17,7 +17,7 @@ public class Route {
         return id;
     }
 
-    public ArrayList<String> getEdges() {
+    public SumoStringList getEdges() {
         return edges;
     }
 

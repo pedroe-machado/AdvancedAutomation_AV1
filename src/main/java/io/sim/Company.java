@@ -23,6 +23,8 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
+import de.tudresden.sumo.objects.SumoStringList;
+
 public class Company implements Runnable {
     public static String uriRoutesXML = "\\map\\map.rou.xml";
 
@@ -82,15 +84,14 @@ public class Company implements Runnable {
                     Node nNode = nList.item(i);
                     if (nNode.getNodeType() == Node.ELEMENT_NODE) {
                         Element elem = (Element) nNode;
-                        String id = elem.getAttribute("id");
                         Node node = elem.getElementsByTagName("route").item(0);
                         Element edges = (Element) node;
                         String[] edgesArray = edges.getAttribute("edges").split(" ");
-                        ArrayList<String> edgesList = new ArrayList<>();
+                        SumoStringList edgesList = new SumoStringList();
                         for (String edge : edgesArray) {
                             edgesList.add(edge);
                         }
-                        routesList.add(new Route(id, edgesList));
+                        routesList.add(new Route(Integer.toString(i), edgesList)); // Adiciona corrigindo idRotas descontínuo
                     }
                 }
 
@@ -192,7 +193,8 @@ public class Company implements Runnable {
         @Override
         public void run() {
             try {
-                InputStream input = clientSocket.getInputStream();
+                InputStream inputStream = clientSocket.getInputStream();
+                OutputStream outputStream = clientSocket.getOutputStream();
                 byte[] encryptedData = input.readAllBytes();
 
                 // Descriptografa os dados
@@ -203,11 +205,11 @@ public class Company implements Runnable {
                 JSONObject jsonObject = (JSONObject) obj;
 
                 if (jsonObject.get("servico").equals("REQUEST_ROUTE")) {
-                    // new route handler thread
+                    // new route handler sincronized thread
                 } else if (jsonObject.get("servico").equals("SEND_INFO")) {
-                    // new calculaKm thread
+                    // new calculaKm sincronized thread
                 }
-                input.close();
+                inputStream.close();
                 clientSocket.close();
 
                 Thread.sleep(0, 100);
@@ -254,8 +256,10 @@ public class Company implements Runnable {
         public BotPayment(String idDriver) throws UnknownHostException, IOException{
             this.socket = new Socket("127.0.0.1", 20180);
             this.jsonObject = new JSONObject();
-            this.jsonObject.put("driver", idDriver);
-            this.jsonObject.put("servico", 3.25);
+            this.jsonObject.put("idConta", "company");
+            this.jsonObject.put("senha", "company");
+            this.jsonObject.put("idBeneficiario", idDriver);
+            this.jsonObject.put("valor", 3.25);
         }
 
         @Override

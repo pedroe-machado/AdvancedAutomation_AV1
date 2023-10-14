@@ -44,7 +44,6 @@ public class EnvSimulator extends Thread{
                 Thread.sleep(5000);
 				a1.start();
 			}
-
 		
 		} catch (IOException e1) {
 			e1.printStackTrace();

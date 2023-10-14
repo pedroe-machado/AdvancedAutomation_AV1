@@ -29,7 +29,7 @@ public class Auto extends Thread {
 	private ArrayList<DrivingData> drivingRepport;
 	
 	public Auto(boolean _on_off, String _idAuto, SumoColor _colorAuto, String _driverID, SumoTraciConnection _sumo, long _acquisitionRate,
-			int _fuelType, int _fuelPreferential, double _fuelPrice, int _personCapacity, int _personNumber) throws Exception {
+			int _fuelType, int _fuelPreferential, double _fuelPrice, int _personCapacity, int _personNumber, Car upCar) throws Exception {
 
 		this.on_off = _on_off;
 		this.idAuto = _idAuto;
@@ -66,6 +66,7 @@ public class Auto extends Thread {
 				e.printStackTrace();
 			}
 		}
+
 	}
 
 	private void atualizaSensores() {
@@ -121,6 +122,7 @@ public class Auto extends Thread {
 				// sumo.do_job_get(Vehicle.getAllowedSpeed(this.idSumoVehicle));
 
 				this.drivingRepport.add(_repport);
+				upCar.getRepport(_repport);
 
 				//System.out.println("Data: " + this.drivingRepport.size());
 				System.out.println("idAuto = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getAutoID());
