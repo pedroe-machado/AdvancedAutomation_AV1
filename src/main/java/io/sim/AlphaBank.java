@@ -7,9 +7,24 @@ import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.HashMap;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.simple.parser.JSONParser;
 
+/**
+ * - Classe (Thread) que implementa o AlphaBank -
+ * 
+ * Seu funcionamento é basicamente de um servidor que controla um HashMap 
+ * com todas as contas bancárias. Quando um BotPayment se conecta ao banco, é 
+ * lançada uma thread responsável por lidar com aquela transferência.
+ * 
+ * Os BotPayments devem enviar um JSONObject criptografado com os campos:
+ * "idConta"{"String: id do remetente"}
+ * "senha"{"String: senha do remetente - default senha=idConta"}
+ * "idBeneficiario"{String: id de quem irá receber a transferência}
+ * ¹"valor"{"Double: valor a ser transferido"}
+ * ¹ Drivers que transferirão todo seu dinheiro não adicionam chave "valor" 
+*/
 public class AlphaBank implements Runnable{
 
     private HashMap<String, Account> contas;
@@ -63,7 +78,11 @@ public class AlphaBank implements Runnable{
                 this.idConta = (String) dadosTranferencia.get("idConta");
                 this.senha = (String) dadosTranferencia.get("senha");
                 this.idBeneficiario = (String) dadosTranferencia.get("idBeneficiario");
-                this.valor = (double) dadosTranferencia.get("valor");
+                try {
+                    this.valor = (double) dadosTranferencia.get("valor");
+                } catch (JSONException e) {
+                    this.valor = getAccount(idConta, senha).getSaldo();
+                }
 
                 input.close();
                 clientSocket.close();
