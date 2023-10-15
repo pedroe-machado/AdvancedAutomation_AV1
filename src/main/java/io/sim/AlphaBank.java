@@ -33,7 +33,7 @@ public class AlphaBank implements Runnable{
         }
     }
 
-    public Account getAccount(String idConta, String senha) {
+    public synchronized Account getAccount(String idConta, String senha) {
         Account conta = contas.get(idConta);
         if (conta != null && conta.autenticar(senha)) {
             return conta;
@@ -41,14 +41,13 @@ public class AlphaBank implements Runnable{
         return null;
     }
 
-    public void transferePara(String idConta, double valor) {
+    public synchronized void transferePara(String idConta, double valor) {
         contas.get(idConta).recebe(valor);
     }
 
     private class Transferencia extends Thread{
 
         private String idConta, senha;
-        private AlphaBank alphaBank;
         private String idBeneficiario;
         private double valor;
 
@@ -62,7 +61,6 @@ public class AlphaBank implements Runnable{
                 Object obj = parser.parse(new String(decryptedData));
                 JSONObject dadosTranferencia = (JSONObject) obj;
 
-                this.alphaBank = alphaBank;
                 this.idConta = (String) dadosTranferencia.get("idConta");
                 this.senha = (String) dadosTranferencia.get("senha");
                 this.idBeneficiario = (String) dadosTranferencia.get("idBeneficiario");
@@ -80,8 +78,8 @@ public class AlphaBank implements Runnable{
 
         @Override
         public void run(){
-            alphaBank.getAccount(idConta, senha).debita(valor);
-            alphaBank.transferePara(idBeneficiario, valor);
+            getAccount(idConta, senha).debita(valor);
+            transferePara(idBeneficiario, valor);
         }
     }
 }
