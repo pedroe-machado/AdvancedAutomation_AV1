@@ -1,5 +1,4 @@
 package io.sim;
-import java.util.ArrayList;
 
 import de.tudresden.sumo.objects.SumoStringList;
 import de.tudresden.sumo.util.SumoCommand;

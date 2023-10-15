@@ -3,6 +3,11 @@ package io.sim;
 import javax.crypto.*;
 import javax.crypto.spec.*;
 
+/**
+ * Classe utilitária para criptografia e descriptografia de dados usando o algoritmo AES.
+ * Esta classe utiliza o modo de operação CBC (Cipher Block Chaining) com padding PKCS5.
+ * As chaves e IVs são fornecidos como constantes estáticas para fins de teste.
+ */
 public class CryptoUtils {
 
     private static final String ALGORITHM = "AES";
