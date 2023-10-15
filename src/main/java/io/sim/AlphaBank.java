@@ -18,7 +18,7 @@ import org.json.simple.parser.JSONParser;
  * com todas as contas bancárias. Quando um BotPayment se conecta ao banco, é 
  * lançada uma thread responsável por lidar com aquela transferência.
  * 
- * Os BotPayments devem enviar um JSONObject criptografado com os campos:
+ * Os BotPayments devem enviar um JSONObject criptografado na porta 20180 com os campos:
  * "idConta"{"String: id do remetente"}
  * "senha"{"String: senha do remetente - default senha=idConta"}
  * "idBeneficiario"{String: id de quem irá receber a transferência}
@@ -40,7 +40,7 @@ public class AlphaBank implements Runnable{
         while (true) {
             try {
                 Socket clientSocket = serverSocket.accept(); // Aceita uma nova conexão
-                new Transferencia(clientSocket,this).start(); // Inicia uma nova thread para lidar com o cliente
+                new Transferencia(clientSocket).start(); // Inicia uma nova thread para lidar com o cliente
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -65,7 +65,7 @@ public class AlphaBank implements Runnable{
         private String idBeneficiario;
         private double valor;
 
-        public Transferencia(Socket clientSocket, AlphaBank alphaBank) {
+        public Transferencia(Socket clientSocket) {
             try {
                 InputStream input = clientSocket.getInputStream();
                 byte[] encryptedData = input.readAllBytes();
