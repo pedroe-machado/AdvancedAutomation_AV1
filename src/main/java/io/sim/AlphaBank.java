@@ -38,6 +38,7 @@ public class AlphaBank implements Runnable{
             accounts.put(id, new Account(id, 0));
         }
         serverSocket = new ServerSocket(20180);
+        new Thread(this).start();
     }
 
     @Override
@@ -46,7 +47,8 @@ public class AlphaBank implements Runnable{
             try {
                 Socket clientSocket = serverSocket.accept(); // Aceita uma nova conexão
                 new Transferencia(clientSocket).start(); // Inicia uma nova thread para lidar com o cliente
-            } catch (IOException e) {
+                Thread.sleep(100);
+            } catch (IOException | InterruptedException e) {
                 e.printStackTrace();
             }
         }
