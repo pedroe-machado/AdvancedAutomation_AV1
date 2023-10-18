@@ -156,7 +156,6 @@ public class DrivingData {
 		this.HCEmission = _HCEmission;
 		this.personCapacity = _personCapacity;
 		this.personNumber = _personNumber;
-
 	}
 
 	public double getSpeed() {
@@ -230,4 +229,5 @@ public class DrivingData {
 	public void setAverageFuelConsumption(double _averageFuelConsumption) {
 		this.averageFuelConsumption = _averageFuelConsumption;
 	}
+
 }

@@ -1,5 +1,24 @@
 package io.sim;
 
+import org.jfree.chart.ChartFactory;
+import org.jfree.chart.ChartPanel;
+import org.jfree.chart.JFreeChart;
+import org.jfree.data.category.DefaultCategoryDataset;
+
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionListener;
+
+import org.apache.poi.ss.formula.functions.Na;
+import org.jfree.chart.block.BlockBorder;
+import org.jfree.chart.plot.PlotOrientation;
+import org.jfree.chart.plot.XYPlot;
+import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
+import org.jfree.chart.title.TextTitle;
+import org.jfree.data.xy.XYDataset;
+import org.jfree.data.xy.XYSeries;
+import org.jfree.data.xy.XYSeriesCollection;
+
 import java.io.IOException;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
@@ -8,6 +27,8 @@ import de.tudresden.sumo.cmd.Vehicle;
 import java.util.ArrayList;
 
 import it.polito.appeal.traci.SumoTraciConnection;
+import javafx.event.ActionEvent;
+import java.awt.event.ActionListener;
 import de.tudresden.sumo.objects.SumoColor;
 import de.tudresden.sumo.objects.SumoPosition2D;
 
@@ -27,9 +48,11 @@ public class Auto extends Thread {
 	private int personNumber;		// the total number of persons which are riding in this vehicle
 
 	private ArrayList<DrivingData> drivingRepport;
-	
+	private CalculaKm km;
+	private RealTimeChart graph;
+
 	public Auto(boolean _on_off, String _idAuto, SumoColor _colorAuto, String _driverID, SumoTraciConnection _sumo, long _acquisitionRate,
-			int _fuelType, int _fuelPreferential, double _fuelPrice, int _personCapacity, int _personNumber, Car upCar) throws Exception {
+			int _fuelType, int _fuelPreferential, double _fuelPrice, int _personCapacity, int _personNumber) throws Exception {
 
 		this.on_off = _on_off;
 		this.idAuto = _idAuto;
@@ -54,14 +77,17 @@ public class Auto extends Thread {
 		this.personCapacity = _personCapacity;
 		this.personNumber = _personNumber;
 		this.drivingRepport = new ArrayList<DrivingData>();
+		//graph = new RealTimeChart("Real Time CO2 Emission [mg/s]");
+		this.km = new CalculaKm();
 	}
 
 	@Override
 	public void run() {
 		while (this.on_off) {
 			try {
-				//Auto.sleep(this.acquisitionRate);
+				Auto.sleep(this.acquisitionRate);
 				this.atualizaSensores();
+				notify();
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -76,6 +102,8 @@ public class Auto extends Thread {
 			if (!this.getSumo().isClosed()) {
 				SumoPosition2D sumoPosition2D;
 				sumoPosition2D = (SumoPosition2D) sumo.do_job_get(Vehicle.getPosition(this.idAuto));
+				
+				double infoDistanceCompany = km.calcular(sumoPosition2D.toString()); //EXIGÊNCIA CALCULO LONG/LAT
 
 				System.out.println("AutoID: " + this.getIdAuto());
 				System.out.println("RoadID: " + (String) this.sumo.do_job_get(Vehicle.getRoadID(this.idAuto)));
@@ -84,11 +112,11 @@ public class Auto extends Thread {
 				
 				DrivingData _repport = new DrivingData(
 
-						this.idAuto, this.driverID, System.currentTimeMillis(), sumoPosition2D.x, sumoPosition2D.y,
+						this.idAuto, this.driverID, System.nanoTime(), sumoPosition2D.x, sumoPosition2D.y,
 						(String) this.sumo.do_job_get(Vehicle.getRoadID(this.idAuto)),
 						(String) this.sumo.do_job_get(Vehicle.getRouteID(this.idAuto)),
 						(double) sumo.do_job_get(Vehicle.getSpeed(this.idAuto)),
-						(double) sumo.do_job_get(Vehicle.getDistance(this.idAuto)),
+						infoDistanceCompany,
 
 						(double) sumo.do_job_get(Vehicle.getFuelConsumption(this.idAuto)),
 						// Vehicle's fuel consumption in ml/s during this time step,
@@ -122,7 +150,8 @@ public class Auto extends Thread {
 				// sumo.do_job_get(Vehicle.getAllowedSpeed(this.idSumoVehicle));
 
 				this.drivingRepport.add(_repport);
-				upCar.getRepport(_repport);
+				new Excel(_repport);
+				//graph.addData(_repport.getCo2Emission(), "CO2 Emission", "Time");
 
 				//System.out.println("Data: " + this.drivingRepport.size());
 				System.out.println("idAuto = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getAutoID());
@@ -133,8 +162,6 @@ public class Auto extends Thread {
 				System.out.println("speed = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getSpeed());
 				System.out.println("odometer = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getOdometer());
 				System.out.println("Fuel Consumption = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getFuelConsumption());
-				//System.out.println("Fuel Type = " + this.fuelType);
-				//System.out.println("Fuel Price = " + this.fuelPrice);
 
 				System.out.println("CO2 Emission = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getCo2Emission());
 
@@ -179,11 +206,12 @@ public class Auto extends Thread {
 		}
 	}
 
-	synchronized private void exportaTxt(String linha) throws IOException{
+	/*synchronized private void exportaTxt(String linha) throws IOException{
 		BufferedWriter buffWrite = new BufferedWriter(new FileWriter("\\Users\\Usuario\\OneDrive\\Documentos\\Cursos\\Ufla\\11 periodo\\Sistemas Distribuídos\\report.txt", true));
 		buffWrite.append(linha + "\n");
 		buffWrite.close();
-	}
+	}*/
+
 
 	public boolean isOn_off() {
 		return this.on_off;
@@ -252,4 +280,127 @@ public class Auto extends Thread {
 	public int getPersonNumber() {
 		return this.personNumber;
 	}
+
+	private class CalculaKm{
+		private double longitude;
+		private double latitude;
+		private double cartesianoX;
+		private double cartesianoY;
+		private double[] historicoLatitude;
+		private double[] historicoLongitude;
+		private int aux;
+		private double distancia;
+	
+		public CalculaKm(){
+			historicoLatitude = new double[2];
+			historicoLongitude = new double[2];
+			aux = 0;
+			distancia = 0;
+		}
+	
+		public double calcular(String posicao) throws Exception{
+			String[] partes = posicao.split(",");
+			try {
+				cartesianoX = Double.parseDouble(partes[0]);
+				cartesianoY = Double.parseDouble(partes[1]);
+			} catch (NumberFormatException e) {}
+			
+			double latitudeOrigem = 40.0;  // Latitude da origem em graus
+			double longitudeOrigem = -75.0;  // Longitude da origem em graus
+			
+			// Constante para conversão de graus para radianos
+			double degToRad = Math.PI / 180.0;
+			
+			// Converter coordenadas cartesianas para latitude e longitude
+			latitude = latitudeOrigem + (cartesianoY / 111320.0);
+			longitude = longitudeOrigem + (cartesianoX / (111320.0 * Math.cos(latitudeOrigem * degToRad)));
+			historico();
+			return distancia;
+		}
+	
+		private void historico(){
+			if(aux == 1){
+				historicoLatitude[1] = latitude;
+				historicoLongitude[1] = longitude;
+				atualizaDistancia();
+			} else{
+				historicoLatitude[0] = latitude;
+				historicoLongitude[0] = longitude;
+				aux++;
+			}
+		}
+		
+		public void atualizaDistancia(){
+			double R = 6371;
+	
+			// Diferença de latitude e longitude
+			double dlat = Math.toRadians(historicoLatitude[1]) - Math.toRadians(historicoLatitude[0]);
+			double dlon = Math.toRadians(historicoLongitude[1]) - Math.toRadians(historicoLongitude[0]);
+	
+			// Fórmula de Haversine
+			double a = Math.sin(dlat / 2) * Math.sin(dlat / 2) +
+					   Math.cos(Math.toRadians(historicoLatitude[0])) * Math.cos(Math.toRadians(historicoLatitude[1])) *
+					   Math.sin(dlon / 2) * Math.sin(dlon / 2);
+	
+			double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+	
+			// Distância em metros
+			distancia = R * c * 1000;
+			historicoLatitude[0] = historicoLatitude[1];
+			historicoLongitude[0] = historicoLongitude[1];
+	
+		}
+	
+	}
+	public class RealTimeChart extends JFrame implements Runnable {
+		private DefaultCategoryDataset dataset;
+
+		public RealTimeChart(String title) {
+			dataset = new DefaultCategoryDataset();
+			JFreeChart chart = ChartFactory.createLineChart(
+					title,
+					"Time",
+					"Value",
+					dataset
+			);
+
+			ChartPanel chartPanel = new ChartPanel(chart);
+			chartPanel.setPreferredSize(new Dimension(560, 370));
+			add(chartPanel);
+
+			setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+			pack();
+			setVisible(true);
+			
+			new Thread(this).start();
+    	}
+
+		@Override
+		public void run() {
+			while(true){
+			Timer timer = new Timer(1000, new ActionListener() {
+				@Override
+				public void actionPerformed(java.awt.event.ActionEvent e) {
+					// Atualize os dados aqui
+					// Suponha que você tenha uma lista chamada 'dados' que está sendo atualizada em
+					// algum lugar
+					for (int i = 0; i < drivingRepport.size(); i++) {
+						addData(drivingRepport.get(i).getCo2Emission(), "Série", "Categoria " + i);
+					}
+				}
+			});
+
+			timer.start();
+			try {
+				Thread.sleep(500);
+			} catch (Exception e) {e.printStackTrace();}
+			}
+		}
+
+		public void addData(double value, String seriesKey, String categoryKey) {
+			dataset.addValue(value, seriesKey, categoryKey);
+			repaint();
+		}
+	}
+
 }

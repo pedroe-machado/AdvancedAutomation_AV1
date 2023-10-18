@@ -1,0 +1,83 @@
+package io.sim;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+
+import org.apache.poi.hssf.usermodel.HSSFSheet;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+
+public class Excel extends Thread{
+
+    private static final String fileName = "/data/Relatorio.xls";
+    private static HSSFWorkbook workbook;
+    private HSSFSheet sheet;
+    private DrivingData repport;
+
+    public Excel(DrivingData repport){
+        this.repport = repport;
+        workbook = new HSSFWorkbook();
+        this.start();
+    }
+
+    @Override
+    public void run(){
+
+        try {
+            this.sheet = workbook.getSheet(repport.getAutoID());
+        } catch (Exception e) {
+            this.sheet = workbook.createSheet(repport.getAutoID());
+        }
+
+        int rownum = 0;{
+            Row row = sheet.createRow(rownum++);
+            int cellnum = 0;
+            Cell cellTime = row.createCell(cellnum++);
+            cellTime.setCellValue(repport.getTimeStamp());
+
+            Cell cellAuto = row.createCell(cellnum++);
+            cellAuto.setCellValue(repport.getAutoID());
+
+            Cell cellRoute = row.createCell(cellnum++);
+            cellRoute.setCellValue(repport.getRouteIDSUMO());
+
+            Cell cellSpeed = row.createCell(cellnum++);
+            cellSpeed.setCellValue(repport.getSpeed());
+
+            Cell cellDistance = row.createCell(cellnum++);
+            cellDistance.setCellValue(repport.getOdometer());
+
+            Cell cellMedia = row.createCell(cellnum++);
+            cellMedia.setCellValue(repport.getFuelConsumption());
+
+            Cell cellType = row.createCell(cellnum++);
+            cellType.setCellValue(repport.getFuelType());   
+
+            Cell cellCo2 = row.createCell(cellnum++);
+            cellCo2.setCellValue(repport.getCo2Emission());
+
+            Cell cellLongitude = row.createCell(cellnum++);
+            cellLongitude.setCellValue(repport.getLongitude());
+
+            Cell cellLatitude = row.createCell(cellnum++);
+            cellLatitude.setCellValue(repport.getLatitude());
+        }
+
+        try {
+            FileOutputStream out = new FileOutputStream(new File(Excel.fileName));
+            workbook.write(out);
+            out.close();
+            System.out.println("Arquivo Excel criado com sucesso!");
+
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+            System.out.println("Arquivo não encontrado!");
+        } catch (IOException e) {
+            e.printStackTrace();
+            System.out.println("Erro na edição do arquivo!");
+        }
+    }
+}
