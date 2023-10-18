@@ -2,9 +2,11 @@ package io.sim;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.HashMap;
 
 import org.json.JSONException;
@@ -27,11 +29,14 @@ import org.json.simple.parser.JSONParser;
 */
 public class AlphaBank implements Runnable{
 
-    private HashMap<String, Account> contas;
+    private HashMap<String, Account> accounts;
     private ServerSocket serverSocket;
     
-    public AlphaBank() throws UnknownHostException, IOException {
-        contas = new HashMap<>();
+    public AlphaBank(ArrayList<String> users) throws UnknownHostException, IOException {
+        accounts = new HashMap<>();
+        for (String id : users) {
+            accounts.put(id, new Account(id, 0));
+        }
         serverSocket = new ServerSocket(20180);
     }
 
@@ -48,7 +53,7 @@ public class AlphaBank implements Runnable{
     }
 
     public synchronized Account getAccount(String idConta, String senha) {
-        Account conta = contas.get(idConta);
+        Account conta = accounts.get(idConta);
         if (conta != null && conta.autenticar(senha)) {
             return conta;
         }
@@ -56,7 +61,7 @@ public class AlphaBank implements Runnable{
     }
 
     public synchronized void transferePara(String idConta, double valor) {
-        contas.get(idConta).recebe(valor);
+        accounts.get(idConta).recebe(valor);
     }
 
     private class Transferencia extends Thread{
@@ -75,16 +80,17 @@ public class AlphaBank implements Runnable{
                 Object obj = parser.parse(new String(decryptedData));
                 JSONObject dadosTranferencia = (JSONObject) obj;
 
+                input.close();
+
                 this.idConta = (String) dadosTranferencia.get("idConta");
                 this.senha = (String) dadosTranferencia.get("senha");
                 this.idBeneficiario = (String) dadosTranferencia.get("idBeneficiario");
                 try {
                     this.valor = (double) dadosTranferencia.get("valor");
                 } catch (JSONException e) {
-                    this.valor = getAccount(idConta, senha).getSaldo();
+                    this.valor = getAccount(idConta, senha).getSaldo();   
                 }
 
-                input.close();
                 clientSocket.close();
 
             } catch (IOException e) {
@@ -98,6 +104,44 @@ public class AlphaBank implements Runnable{
         public void run(){
             getAccount(idConta, senha).debita(valor);
             transferePara(idBeneficiario, valor);
+        }
+    }
+
+    private class Account{
+    
+        private String idConta;
+        private String senha;
+        private double saldo;
+        private boolean autenticado;
+    
+        public Account(String idConta, double saldo){
+            this.idConta = this.senha = idConta;
+            this.saldo = saldo;
+        }
+    
+        public double getSaldo(){
+            return saldo;
+        }
+        
+        public String getIdConta(){
+            return idConta;
+        }
+    
+        public void recebe(double valor){
+            saldo += valor;
+        }
+    
+        public void debita(double valor){
+            if(autenticado) saldo -= valor;
+            else System.out.println("erro de autenticacao");
+        }
+    
+        public boolean autenticar(String _senha){
+            if( _senha.equalsIgnoreCase(senha)){
+                autenticado = true;
+                return true;
+            }
+            return false;
         }
     }
 }

@@ -61,9 +61,9 @@ public class AddRouteQuery extends ChangeStateQuery {
 		
 		if (routes.getByID(id) != null)
 			throw new IllegalArgumentException("route already exists");
-		
+
 		this.id = id;
-		
+
 		this.edges = new StringList();
 		for (Edge edge : edges) {
 			this.edges.add(edge.getID());

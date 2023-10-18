@@ -116,8 +116,8 @@ public class SumoTraciConnection {
 
 	private List<String> args = new ArrayList<String>();
 
-	private DataInputStream dis;
-	private DataOutputStream dos;
+	public DataInputStream dis;
+	public DataOutputStream dos;
 
 	private final Set<StepAdvanceListener> stepAdvanceListeners = new HashSet<StepAdvanceListener>();
 
@@ -131,8 +131,8 @@ public class SumoTraciConnection {
 	private RemoveVehicleQuery removeVehicleQuery;
 	private AddRouteQuery addRouteQuery;
 
-	private Repository.Edges edgeRepo;
-	private Repository.Lanes laneRepo;
+	public Repository.Edges edgeRepo;
+	public Repository.Lanes laneRepo;
 	private Repository.Vehicles vehicleRepo;
 	private Repository.POIs poiRepo;
 	private Repository.InductionLoops inductionLoopRepo;

@@ -9,12 +9,14 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.HashMap;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.apache.logging.log4j.core.jmx.Server;
+import org.json.JSONObject;
 import org.json.simple.*;
 import org.json.simple.parser.JSONParser;
 import org.w3c.dom.Document;
@@ -23,16 +25,38 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
+import de.tudresden.sumo.objects.SumoColor;
 import de.tudresden.sumo.objects.SumoStringList;
+import it.polito.appeal.traci.SumoTraciConnection;
 
 public class Company implements Runnable {
     public static String uriRoutesXML = "\\map\\map.rou.xml";
+
+    private CompanyServer server;
+    private ArrayList<Car> carrosFirma;
+    private ArrayList<Driver> drivers;
 
     private ArrayList<Route> avaliableRoutes;
     private ArrayList<Route> runningRoutes;
     private ArrayList<Route> finishedRoutes;
 
-    public Company(){
+    private SumoTraciConnection sumo;
+
+    public Company(SumoTraciConnection sumo) throws Exception{
+        this.sumo = sumo;
+        this.carrosFirma = new ArrayList<>();
+        this.server = new CompanyServer();
+
+        for(int i=0; i<3; i++){ // Contratação de Drivers e cadastro de novos carros
+            
+            Car newCar = new Car(true, Integer.toString(i), new SumoColor(0, 255, 0, 126),Integer.toString(i),sumo,500,2,2,5.87,5,1);
+            Driver newDriver = new Driver(Integer.toString(i), newCar);
+
+            carrosFirma.add(i,newCar);
+            drivers.add(i,newDriver);
+
+        }
+
         reconstructOriginalFile(); //testar se xml já foi limpo
         new Thread(this).start();
     }
@@ -41,16 +65,16 @@ public class Company implements Runnable {
     public void run() {
 
         CreateRoutes createRoutes = new CreateRoutes();
-            createRoutes.start();
-            try {
-                createRoutes.join();
-                this.avaliableRoutes = createRoutes.getRoutes();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+        createRoutes.start();
+        try {
+            createRoutes.join();
+            this.avaliableRoutes = createRoutes.getRoutes();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
         
+        server.start();
         while(true){
-
 
 
             try {
@@ -194,22 +218,24 @@ public class Company implements Runnable {
         public void run() {
             try {
                 InputStream inputStream = clientSocket.getInputStream();
-                OutputStream outputStream = clientSocket.getOutputStream();
-                byte[] encryptedData = input.readAllBytes();
+                byte[] encryptedData = inputStream.readAllBytes();
 
                 // Descriptografa os dados
-                byte[] decryptedData = CryptoUtils.decrypt(CryptoUtils.getStaticKey(), CryptoUtils.getStaticIV(),encryptedData);
+                byte[] decryptedData = CryptoUtils.decrypt(CryptoUtils.getStaticKey(), CryptoUtils.getStaticIV(), encryptedData);
 
                 JSONParser parser = new JSONParser();
                 Object obj = parser.parse(new String(decryptedData));
                 JSONObject jsonObject = (JSONObject) obj;
+                inputStream.close();
 
+                OutputStream outputStream = clientSocket.getOutputStream();
                 if (jsonObject.get("servico").equals("REQUEST_ROUTE")) {
                     // new route handler sincronized thread
                 } else if (jsonObject.get("servico").equals("SEND_INFO")) {
                     // new calculaKm sincronized thread
                 }
-                inputStream.close();
+
+                outputStream.close();
                 clientSocket.close();
 
                 Thread.sleep(0, 100);
@@ -218,20 +244,6 @@ public class Company implements Runnable {
             } catch (Exception e) {
                 e.printStackTrace();
             }
-        }
-    }
-
-    //
-    private class AtribuiRota extends Thread{
-        
-        JSONObject jsonObject;
-        public AtribuiRota(JSONObject jsonObject){
-            this.jsonObject = jsonObject;
-        }
-
-        @Override
-        public void run(){
-
         }
     }
 
@@ -244,6 +256,7 @@ public class Company implements Runnable {
 
         @Override
         public void run(){
+            
             
         }
     }
@@ -268,7 +281,7 @@ public class Company implements Runnable {
                 OutputStream output = socket.getOutputStream();
 
                 // Converte o JSON em bytes
-                byte[] jsonBytes = jsonObject.toJSONString().getBytes();
+                byte[] jsonBytes = jsonObject.toString().getBytes();
 
                 // Criptografa os dados
                 byte[] encryptedData = CryptoUtils.encrypt(CryptoUtils.getStaticKey(), CryptoUtils.getStaticIV(), jsonBytes);
@@ -284,4 +297,15 @@ public class Company implements Runnable {
         }
     }
     
+    public ArrayList<Route> getAvaliableRoutes(){
+        return avaliableRoutes;
+    }
+
+    public ArrayList<Route> getFinishedRoutes(){
+        return finishedRoutes;
+    }
+
+    public ArrayList<Route> getRunningRoutes(){
+        return runningRoutes;
+    }
 }
