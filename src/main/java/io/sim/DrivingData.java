@@ -9,6 +9,8 @@ public class DrivingData {
 	private long timeStamp; 			// System.currentTimeMillis()
 	private double x_Position; 			// sumoPosition2D (x)
 	private double y_Position; 			// sumoPosition2D (y)
+	private double latL; // Latitude
+	private double lonL; // Longitude
 	private String roadIDSUMO; 			// this.sumo.do_job_get(Vehicle.getRoadID(this.idAuto))
 	private String routeIDSUMO; 		// this.sumo.do_job_get(Vehicle.getRouteID(this.idAuto))
 	private double speed; 				// in m/s for the last time step
@@ -156,6 +158,17 @@ public class DrivingData {
 		this.HCEmission = _HCEmission;
 		this.personCapacity = _personCapacity;
 		this.personNumber = _personNumber;
+		this.latL = (40.0) + (_y_Position / 111320.0);
+        this.lonL = (-75.0) + (_x_Position / (111320.0 * Math.cos(40.0 * (Math.PI / 180.0))));
+
+	}
+
+	public double getLongitude(){
+		return this.lonL;
+	}
+
+	public double getLatitude(){
+		return this.latL;
 	}
 
 	public double getSpeed() {
