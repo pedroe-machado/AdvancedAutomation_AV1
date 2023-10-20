@@ -109,8 +109,7 @@ public class AlphaBank implements Runnable{
         }
     }
 
-    private class Account{
-    
+    private class Account{    
         private String idConta;
         private String senha;
         private double saldo;
@@ -121,7 +120,7 @@ public class AlphaBank implements Runnable{
             this.saldo = saldo;
         }
     
-        public double getSaldo(){
+        public synchronized double getSaldo(){
             return saldo;
         }
         
@@ -129,16 +128,16 @@ public class AlphaBank implements Runnable{
             return idConta;
         }
     
-        public void recebe(double valor){
+        public synchronized void recebe(double valor){
             saldo += valor;
         }
     
-        public void debita(double valor){
+        public synchronized void debita(double valor){
             if(autenticado) saldo -= valor;
             else System.out.println("erro de autenticacao");
         }
     
-        public boolean autenticar(String _senha){
+        public synchronized boolean autenticar(String _senha){
             if( _senha.equalsIgnoreCase(senha)){
                 autenticado = true;
                 return true;
