@@ -1,4 +1,5 @@
 package io.sim;
+
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
@@ -16,9 +17,11 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.apache.logging.log4j.core.jmx.Server;
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.simple.*;
 import org.json.simple.parser.JSONParser;
+import org.python.modules.synchronize;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -47,20 +50,17 @@ public class Company implements Runnable {
         this.carrosFirma = new ArrayList<>();
         this.server = new CompanyServer();
 
-        for(int i=0; i<3; i++){ // Contratação de Drivers e cadastro de novos carros
-            
+        for(int i=0; i<3; i++){ // Contratação de Drivers e cadastro de novos carros            
             Car newCar = new Car(true, Integer.toString(i), new SumoColor(0, 255, 0, 126),Integer.toString(i),sumo,500,2,2,5.87,5,1);
-            Driver newDriver = new Driver(Integer.toString(i), newCar);
+            Driver newDriver = new Driver(sumo, Integer.toString(i), newCar);
 
             carrosFirma.add(i,newCar);
             drivers.add(i,newDriver);
-
         }
 
-        reconstructOriginalFile(); //testar se xml já foi limpo
+        //reconstructOriginalFile(); //testar se xml já foi limpo
         new Thread(this).start();
     }
-
     @Override
     public void run() {
 
@@ -85,18 +85,20 @@ public class Company implements Runnable {
         }
     }
 
-    // Gera rotas e processa arquivos raiz
+    /**
+     * Tarefa que obtém as routes a partir do banco de dados XML 
+     * @apiNote a limpeza do arquivo XML já está implementada e deve-se reconstruir o arquivo
+     * antes que o simulador seja executado novamente via reconstructOriginalFile();
+     */
     private class CreateRoutes extends Thread{
         private ArrayList<Route> routes;
 
         @Override
         public void run(){
             this.routes = parseRoutes();
-            limpaXml();
+            //limpaXml();
         }
-
-        private ArrayList<Route> parseRoutes() {
-            
+        private ArrayList<Route> parseRoutes() {         
             ArrayList<Route> routesList = new ArrayList<>();
             try {
                 DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
@@ -150,13 +152,10 @@ public class Company implements Runnable {
                 System.out.println("Erro ao esvaziar o arquivo XML.");
             }
         }
-
         public ArrayList<Route> getRoutes(){
             return routes;
         }
     }
-
-
     public void reconstructOriginalFile() {
         try {
             File originalFile = new File(uriRoutesXML);
@@ -165,7 +164,6 @@ public class Company implements Runnable {
             if(tempFile.exists()){
                 if (tempFile.renameTo(originalFile)) {
                 System.out.println("Arquivo reconstruído com sucesso.");
-                    
                     // Exclui o arquivo temporário
                 if (tempFile.delete()) {
                     System.out.println("Arquivo temporário excluído com sucesso.");
@@ -182,44 +180,42 @@ public class Company implements Runnable {
         }
     }
     
-    /*
+
+    /**
      * Thread que implementa o servidor da empresa. 
-     * cada solicitação de serviço é tratada em uma nova thread
+     * cada solicitação de serviço é tratada em uma nova thread ClientHandler
+     * @apiNote As conexões com o CompanyServer devem ser feitas na porta:20181
     */
     private class CompanyServer extends Thread{
-
         private ServerSocket serverSocket;
 
         public CompanyServer() throws UnknownHostException, IOException{
             serverSocket = new ServerSocket(20181);
         }
-
         @Override
         public void run() {
             while (true) {
                 try {
                     Socket clientSocket = serverSocket.accept(); // Aceita uma nova conexão
                     new ClientHandler(clientSocket).start(); // Inicia uma nova thread para lidar com o cliente
-                } catch (IOException e) {
+                    Thread.sleep(100);
+                } catch (IOException | InterruptedException e) {
                     e.printStackTrace();
                 }
             }
         }
     }
-
     private class ClientHandler extends Thread {
         private Socket clientSocket;
 
         public ClientHandler(Socket clientSocket) {
             this.clientSocket = clientSocket;
         }
-
         @Override
         public void run() {
             try {
                 InputStream inputStream = clientSocket.getInputStream();
                 byte[] encryptedData = inputStream.readAllBytes();
-
                 // Descriptografa os dados
                 byte[] decryptedData = CryptoUtils.decrypt(CryptoUtils.getStaticKey(), CryptoUtils.getStaticIV(), encryptedData);
 
@@ -230,15 +226,15 @@ public class Company implements Runnable {
 
                 OutputStream outputStream = clientSocket.getOutputStream();
                 if (jsonObject.get("servico").equals("REQUEST_ROUTE")) {
-                    // new route handler sincronized thread
+                    // new route handler sincronized thread NEW SERVICE
+                    new ManageRoute(clientSocket, jsonObject);
                 } else if (jsonObject.get("servico").equals("SEND_INFO")) {
-                    // new calculaKm sincronized thread
+                    new CalculaKm(jsonObject);
                 }
 
                 outputStream.close();
                 clientSocket.close();
 
-                Thread.sleep(0, 100);
             } catch (IOException e) {
                 e.printStackTrace();
             } catch (Exception e) {
@@ -247,22 +243,117 @@ public class Company implements Runnable {
         }
     }
 
-    private class CalculaKm extends Thread{
-        
-        JSONObject jsonObject;
-        public CalculaKm(JSONObject jsonObject){
-            this.jsonObject = jsonObject;
-        }
 
+    /**
+     * Thread que gerencia as listas de rotas e retorna a rota solicitada
+     * @param carSocket o qual estabelecida conexão ClientHandler-Car
+     * @param jsonObject contendo rota finalizada se houver
+     * 
+     * @return Route a ser atribuida a um novo Service 
+     */
+    private class ManageRoute extends Thread{
+        private JSONObject jsonRoute;
+        private boolean resumedRoute;
+        private Route routeFinalizada;
+        private Socket carSocket;
+
+        public ManageRoute(Socket connection, JSONObject jsonObject) {
+            resumedRoute = true;
+            carSocket = connection;
+            jsonRoute = new JSONObject();
+            try {
+                routeFinalizada = (Route) jsonObject.get("routeFinished");
+            } catch (Exception e) {
+                resumedRoute = false;
+            }
+            this.start();
+        }
+        private synchronized void reorganize(){
+            try{
+                Route auxRoute = getRoutesAccess().remove(getRoutesAccess().size()-1);
+                getRunningAccess().add(Integer.parseInt(auxRoute.getId()), auxRoute);
+                this.jsonRoute.put("rota",auxRoute);
+                if(resumedRoute){
+                    getFinishedAccess().add(Integer.parseInt(routeFinalizada.getId()),routeFinalizada);
+                }
+            } catch (NullPointerException e){
+                System.out.println("erro ao acessar lista");
+            }
+        }                             
+        private void sendRoute(){
+            try {
+                OutputStream output = carSocket.getOutputStream();
+                byte[] jsonBytes = jsonRoute.toString().getBytes();
+                byte[] encryptedData = CryptoUtils.encrypt(CryptoUtils.getStaticKey(), CryptoUtils.getStaticIV(), jsonBytes);
+                output.write(encryptedData);
+                output.close();
+                carSocket.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+                System.out.println("erro ao enviar rota");
+            }
+        }
         @Override
         public void run(){
-            
-            
+            reorganize();
+            sendRoute();
         }
     }
 
-    private class BotPayment extends Thread {
+    /**
+     * Thread que gerencia o deslocamento de cada Car associado
+     * @param jsonObject recebido pelo Company Server 
+     */
+    private class CalculaKm extends Thread{        
+        private boolean singleMap;
+        private String idAuto;
+        private double distance;
+        private static HashMap<String,Double> controlMap;
 
+        public CalculaKm(JSONObject jsonObject){
+            controlMap = getInstanciaMapa();
+            idAuto = (String)jsonObject.get("idAuto");
+            double newDistancia = (double)jsonObject.get("km");
+            try {
+                attMap(idAuto, newDistancia);
+                this.start();
+            } catch (NullPointerException e) {
+                System.out.println("error mapa de distancias");
+            }
+        }
+        private synchronized HashMap<String,Double> getInstanciaMapa() {
+            if(!singleMap){ 
+                singleMap = true;
+                return new HashMap<>();
+            }
+            return controlMap;
+        }
+        private synchronized void attMap(String idAuto, double newDistance){
+            distance = controlMap.get(idAuto);
+            distance += newDistance;
+            controlMap.put(idAuto,distance);
+        }
+        @Override
+        public void run(){
+            if(distance>=1000){
+                try {
+                    new BotPayment(idAuto);
+                    controlMap.put(idAuto,0.0);
+                } catch (UnknownHostException e) {
+                    System.out.println("erro ao tentar pagar motorista" + idAuto + " banco offline");
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }       
+        }
+    }
+
+
+    /**
+     * Thread BotPayment que realiza um pagamento ao driver que completou 1km
+     * @param idDriver que irá receber a transferência
+     */
+    private class BotPayment extends Thread {
         private Socket socket;
         private JSONObject jsonObject;
 
@@ -273,19 +364,16 @@ public class Company implements Runnable {
             this.jsonObject.put("senha", "company");
             this.jsonObject.put("idBeneficiario", idDriver);
             this.jsonObject.put("valor", 3.25);
+            this.start();
         }
-
         @Override
         public void run() {
             try {
                 OutputStream output = socket.getOutputStream();
-
                 // Converte o JSON em bytes
                 byte[] jsonBytes = jsonObject.toString().getBytes();
-
                 // Criptografa os dados
                 byte[] encryptedData = CryptoUtils.encrypt(CryptoUtils.getStaticKey(), CryptoUtils.getStaticIV(), jsonBytes);
-
                 // Envia os dados criptografados para o servidor
                 output.write(encryptedData);
 
@@ -297,15 +385,25 @@ public class Company implements Runnable {
         }
     }
     
-    public ArrayList<Route> getAvaliableRoutes(){
+    
+    public ArrayList<String> getCLTs(){
+        ArrayList<String> listaCLT = new ArrayList<>();
+        for (Driver clt: drivers) {
+            listaCLT.add(clt.getIdDriver());
+        }
+        return listaCLT;
+    }
+    
+    private synchronized ArrayList<Route> getRunningAccess(){
+        return runningRoutes;
+    }
+
+    private synchronized ArrayList<Route> getFinishedAccess(){
+        return finishedRoutes;
+    }
+    
+    private synchronized ArrayList<Route> getRoutesAccess(){
         return avaliableRoutes;
     }
 
-    public ArrayList<Route> getFinishedRoutes(){
-        return finishedRoutes;
-    }
-
-    public ArrayList<Route> getRunningRoutes(){
-        return runningRoutes;
-    }
 }
