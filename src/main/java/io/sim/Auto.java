@@ -27,8 +27,6 @@ import de.tudresden.sumo.cmd.Vehicle;
 import java.util.ArrayList;
 
 import it.polito.appeal.traci.SumoTraciConnection;
-import javafx.event.ActionEvent;
-import java.awt.event.ActionListener;
 import de.tudresden.sumo.objects.SumoColor;
 import de.tudresden.sumo.objects.SumoPosition2D;
 
@@ -49,154 +47,89 @@ public class Auto extends Thread {
 
 	private ArrayList<DrivingData> drivingRepport;
 	private CalculaKm km;
+	private double infoDistanceCompany;
 	private RealTimeChart graph;
 
-	public Auto(boolean _on_off, String _idAuto, SumoColor _colorAuto, String _driverID, SumoTraciConnection _sumo, long _acquisitionRate,
-			int _fuelType, int _fuelPreferential, double _fuelPrice, int _personCapacity, int _personNumber) throws Exception {
-
+	public Auto(boolean _on_off, String _idAuto, SumoColor _colorAuto, String _driverID, SumoTraciConnection _sumo, long _acquisitionRate,int _fuelType, int _fuelPreferential, double _fuelPrice, int _personCapacity, int _personNumber) throws Exception {
+		this.sumo = _sumo;
 		this.on_off = _on_off;
 		this.idAuto = _idAuto;
-		this.colorAuto = _colorAuto;
 		this.driverID = _driverID;
-		this.sumo = _sumo;
-		this.acquisitionRate = _acquisitionRate;
-		
-		if((_fuelType < 0) || (_fuelType > 4)) {
-			this.fuelType = 4;
-		} else {
-			this.fuelType = _fuelType;
-		}
-		
-		if((_fuelPreferential < 0) || (_fuelPreferential > 4)) {
-			this.fuelPreferential = 4;
-		} else {
-			this.fuelPreferential = _fuelPreferential;
-		}
-
+		this.colorAuto = _colorAuto;
 		this.fuelPrice = _fuelPrice;
-		this.personCapacity = _personCapacity;
 		this.personNumber = _personNumber;
+		this.personCapacity = _personCapacity;
+		this.acquisitionRate = _acquisitionRate;
+		this.fuelType = ((_fuelType < 0) || (_fuelType > 4)) ? 4 : _fuelType; 					
+		this.fuelPreferential = ((_fuelPreferential < 0) || (_fuelPreferential > 4)) ? 4 : _fuelPreferential;
+
 		this.drivingRepport = new ArrayList<DrivingData>();
-		//graph = new RealTimeChart("Real Time CO2 Emission [mg/s]");
 		this.km = new CalculaKm();
+		this.graph = new RealTimeChart("Real Time CO2 Emission [mg/s]");
 	}
 
 	@Override
 	public void run() {
 		while (this.on_off) {
-			try {
-				Auto.sleep(this.acquisitionRate);
+			try {				
 				this.atualizaSensores();
 				notify();
+				Thread.sleep(this.acquisitionRate);
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
 		}
-
 	}
 
 	private void atualizaSensores() {
-
 		try {
-
 			if (!this.getSumo().isClosed()) {
-				SumoPosition2D sumoPosition2D;
-				sumoPosition2D = (SumoPosition2D) sumo.do_job_get(Vehicle.getPosition(this.idAuto));
-				
-				double infoDistanceCompany = km.calcular(sumoPosition2D.toString()); //EXIGÊNCIA CALCULO LONG/LAT
 
-				System.out.println("AutoID: " + this.getIdAuto());
-				System.out.println("RoadID: " + (String) this.sumo.do_job_get(Vehicle.getRoadID(this.idAuto)));
-				System.out.println("RouteID: " + (String) this.sumo.do_job_get(Vehicle.getRouteID(this.idAuto)));
-				System.out.println("RouteIndex: " + this.sumo.do_job_get(Vehicle.getRouteIndex(this.idAuto)));
+				SumoPosition2D sumoPosition2D = (SumoPosition2D) sumo.do_job_get(Vehicle.getPosition(this.idAuto));
+				infoDistanceCompany = km.calcular(sumoPosition2D.toString()); //EXIGÊNCIA CALCULO LONG/LAT
+
+				//System.out.println("AutoID: " + this.getIdAuto());
+				//System.out.println("RoadID: " + (String) this.sumo.do_job_get(Vehicle.getRoadID(this.idAuto)));
+				//System.out.println("RouteID: " + (String) this.sumo.do_job_get(Vehicle.getRouteID(this.idAuto)));
+				//System.out.println("RouteIndex: " + this.sumo.do_job_get(Vehicle.getRouteIndex(this.idAuto)));
 				
 				DrivingData _repport = new DrivingData(
-
-						this.idAuto, this.driverID, System.nanoTime(), sumoPosition2D.x, sumoPosition2D.y,
-						(String) this.sumo.do_job_get(Vehicle.getRoadID(this.idAuto)),
-						(String) this.sumo.do_job_get(Vehicle.getRouteID(this.idAuto)),
-						(double) sumo.do_job_get(Vehicle.getSpeed(this.idAuto)),
-						infoDistanceCompany,
-
-						(double) sumo.do_job_get(Vehicle.getFuelConsumption(this.idAuto)),
-						// Vehicle's fuel consumption in ml/s during this time step,
-						// to get the value for one step multiply with the step length; error value:
-						// -2^30
-						
+						this.idAuto, 
+						this.driverID, 
+						System.nanoTime(), //Timestamp 
+						sumoPosition2D.x, //posX
+						sumoPosition2D.y, //posY
+						(String) this.sumo.do_job_get(Vehicle.getRoadID(this.idAuto)), //actual edge 
+						(String) this.sumo.do_job_get(Vehicle.getRouteID(this.idAuto)), //actual route
+						(double) sumo.do_job_get(Vehicle.getSpeed(this.idAuto)), //speed
+						infoDistanceCompany, //traveled distance calculated from last step 
+						(double) sumo.do_job_get(Vehicle.getFuelConsumption(this.idAuto)), //Vehicle's fuel consumption in mg/s during this time step, to get the value for one step multiply with the step length						
 						1/*averageFuelConsumption (calcular)*/,
-
-						this.fuelType, this.fuelPrice,
-
-						(double) sumo.do_job_get(Vehicle.getCO2Emission(this.idAuto)),
-						// Vehicle's CO2 emissions in mg/s during this time step,
-						// to get the value for one step multiply with the step length; error value:
-						// -2^30
-
-						(double) sumo.do_job_get(Vehicle.getHCEmission(this.idAuto)),
-						// Vehicle's HC emissions in mg/s during this time step,
-						// to get the value for one step multiply with the step length; error value:
-						// -2^30
-						
-						this.personCapacity,
-						// the total number of persons that can ride in this vehicle
-						
-						this.personNumber
-						// the total number of persons which are riding in this vehicle
-
+						this.fuelType, 
+						this.fuelPrice,
+						(double) sumo.do_job_get(Vehicle.getCO2Emission(this.idAuto)), //Vehicle's CO2 emissions in mg/s during this time step, to get the value for one step multiply with the step length
+						(double) sumo.do_job_get(Vehicle.getHCEmission(this.idAuto)), // Vehicle's HC emissions in mg/s during this time step, to get the value for one step multiply with the step length						
+						this.personCapacity, // the total number of persons that can ride in this vehicle						
+						this.personNumber // the total number of persons which are riding in this vehicle
 				);
 
-				// Criar relat�rio auditoria / alertas
-				// velocidadePermitida = (double)
-				// sumo.do_job_get(Vehicle.getAllowedSpeed(this.idSumoVehicle));
+				// Criar relatorio auditoria / alertas
 
 				this.drivingRepport.add(_repport);
 				new Excel(_repport);
-				//graph.addData(_repport.getCo2Emission(), "CO2 Emission", "Time");
+				graph.addData(_repport.getCo2Emission(), "CO2 Emission", "Time");
 
-				//System.out.println("Data: " + this.drivingRepport.size());
-				System.out.println("idAuto = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getAutoID());
-				//System.out.println(
-				//		"timestamp = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getTimeStamp());
-				//System.out.println("X=" + this.drivingRepport.get(this.drivingRepport.size() - 1).getX_Position() + ", "
-				//		+ "Y=" + this.drivingRepport.get(this.drivingRepport.size() - 1).getY_Position());
-				System.out.println("speed = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getSpeed());
-				System.out.println("odometer = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getOdometer());
-				System.out.println("Fuel Consumption = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getFuelConsumption());
-
-				System.out.println("CO2 Emission = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getCo2Emission());
-
-				//System.out.println();
-				//System.out.println("************************");
-				//System.out.println("testes: ");
-				//System.out.println("getAngle = " + (double) sumo.do_job_get(Vehicle.getAngle(this.idAuto)));
-				//System.out
-				//		.println("getAllowedSpeed = " + (double) sumo.do_job_get(Vehicle.getAllowedSpeed(this.idAuto)));
-				//System.out.println("getSpeed = " + (double) sumo.do_job_get(Vehicle.getSpeed(this.idAuto)));
-				//System.out.println(
-				//		"getSpeedDeviation = " + (double) sumo.do_job_get(Vehicle.getSpeedDeviation(this.idAuto)));
-				//System.out.println("getMaxSpeedLat = " + (double) sumo.do_job_get(Vehicle.getMaxSpeedLat(this.idAuto)));
-				//System.out.println("getSlope = " + (double) sumo.do_job_get(Vehicle.getSlope(this.idAuto))
-				//		+ " the slope at the current position of the vehicle in degrees");
-				//System.out.println(
-				//		"getSpeedWithoutTraCI = " + (double) sumo.do_job_get(Vehicle.getSpeedWithoutTraCI(this.idAuto))
-				//				+ " Returns the speed that the vehicle would drive if no speed-influencing\r\n"
-				//				+ "command such as setSpeed or slowDown was given.");
-
-				//sumo.do_job_set(Vehicle.setSpeed(this.idAuto, (1000 / 3.6)));
-				//double auxspeed = (double) sumo.do_job_get(Vehicle.getSpeed(this.idAuto));
-				//System.out.println("new speed = " + (auxspeed * 3.6));
-				//System.out.println(
-				//		"getSpeedDeviation = " + (double) sumo.do_job_get(Vehicle.getSpeedDeviation(this.idAuto)));
-				
-				
 				sumo.do_job_set(Vehicle.setSpeedMode(this.idAuto, 0));
 				sumo.do_job_set(Vehicle.setSpeed(this.idAuto, 6.95));
 
-				
-				System.out.println("getPersonNumber = " + sumo.do_job_get(Vehicle.getPersonNumber(this.idAuto)));
-				//System.out.println("getPersonIDList = " + sumo.do_job_get(Vehicle.getPersonIDList(this.idAuto)));
-				
-				System.out.println("************************");
+				// System.out.println("idAuto = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getAutoID());
+				// System.out.println("timestamp = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getTimeStamp());
+				// System.out.println("speed = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getSpeed());
+				// System.out.println("odometer = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getOdometer());
+				// System.out.println("Fuel Consumption = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getFuelConsumption());
+				// System.out.println("CO2 Emission = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getCo2Emission());
+				// System.out.println("getPersonNumber = " + sumo.do_job_get(Vehicle.getPersonNumber(this.idAuto)));
+				// System.out.println("************************");
 
 			} else {
 				System.out.println("SUMO is closed...");
@@ -281,6 +214,10 @@ public class Auto extends Thread {
 		return this.personNumber;
 	}
 
+	public double getLastDistance(){
+		return infoDistanceCompany;
+	}
+
 	private class CalculaKm{
 		private double longitude;
 		private double latitude;
@@ -352,6 +289,7 @@ public class Auto extends Thread {
 		}
 	
 	}
+
 	public class RealTimeChart extends JFrame implements Runnable {
 		private DefaultCategoryDataset dataset;
 
