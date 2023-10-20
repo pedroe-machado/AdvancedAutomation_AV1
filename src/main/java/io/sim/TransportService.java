@@ -25,12 +25,9 @@ public class TransportService extends Thread {
 
 	@Override
 	public void run() {
-		try {
-			
+		try {			
 			this.initializeRoutes();
-
 			this.auto.start();
-
 			while (this.on_off) {
 				try {
 					this.sumo.do_timestep();

@@ -7,9 +7,9 @@ public class Route {
     private String id;
     private SumoStringList edges;
 
-    public Route(String id, SumoStringList edges) {
+    public Route(String id, SumoStringList sumoStringList) {
         this.id = id;
-        this.edges = edges;
+        this.edges = sumoStringList;
     }
 
     public String getId() {

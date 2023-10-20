@@ -10,7 +10,7 @@ public class EnvSimulator extends Thread{
     private SumoTraciConnection sumo;
 
     public EnvSimulator(){
-
+		
     }
 
     public void run(){

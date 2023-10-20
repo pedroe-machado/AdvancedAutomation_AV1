@@ -8,13 +8,11 @@ public class FuelStation implements Runnable {
 
     private static Semaphore semaphore = new Semaphore(2);
 
-    public FuelStation(){
-        new Thread(this).start();
-    }
-
     @Override
     public void run(){
+        while(true){
 
+        }
     }
 
     public class FuelPumpThread extends Thread {
