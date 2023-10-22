@@ -1,28 +1,5 @@
 package io.sim;
 
-import org.jfree.chart.ChartFactory;
-import org.jfree.chart.ChartPanel;
-import org.jfree.chart.JFreeChart;
-import org.jfree.data.category.DefaultCategoryDataset;
-
-import javax.swing.*;
-import java.awt.*;
-import java.awt.event.ActionListener;
-
-import org.apache.poi.ss.formula.functions.Na;
-import org.jfree.chart.block.BlockBorder;
-import org.jfree.chart.plot.PlotOrientation;
-import org.jfree.chart.plot.XYPlot;
-import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
-import org.jfree.chart.title.TextTitle;
-import org.jfree.data.xy.XYDataset;
-import org.jfree.data.xy.XYSeries;
-import org.jfree.data.xy.XYSeriesCollection;
-
-import java.io.IOException;
-import java.io.BufferedWriter;
-import java.io.FileWriter;
-
 import de.tudresden.sumo.cmd.Vehicle;
 import java.util.ArrayList;
 
@@ -31,7 +8,8 @@ import de.tudresden.sumo.objects.SumoColor;
 import de.tudresden.sumo.objects.SumoPosition2D;
 
 public class Auto extends Thread {
-
+	private final Object monitor = new Object();
+	private boolean sensoresAtualizados=false;
 	private String idAuto;
 	private SumoColor colorAuto;
 	private String driverID;
@@ -48,7 +26,7 @@ public class Auto extends Thread {
 	private ArrayList<DrivingData> drivingRepport;
 	private CalculaKm km;
 	private double infoDistanceCompany;
-	private RealTimeChart graph;
+	//private RealTimeChart graph;
 
 	public Auto(boolean _on_off, String _idAuto, SumoColor _colorAuto, String _driverID, SumoTraciConnection _sumo, long _acquisitionRate,int _fuelType, int _fuelPreferential, double _fuelPrice, int _personCapacity, int _personNumber) throws Exception {
 		this.sumo = _sumo;
@@ -65,15 +43,19 @@ public class Auto extends Thread {
 
 		this.drivingRepport = new ArrayList<DrivingData>();
 		this.km = new CalculaKm();
-		this.graph = new RealTimeChart("Real Time CO2 Emission [mg/s]");
+		//this.graph = new RealTimeChart("Real Time CO2 Emission [mg/s]");
 	}
 
 	@Override
 	public void run() {
+		try {
+			Thread.sleep(3000);
+		} catch (InterruptedException e) {
+			System.out.println("erro largada auto");
+		}
 		while (this.on_off) {
 			try {				
 				this.atualizaSensores();
-				notify();
 				Thread.sleep(this.acquisitionRate);
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -82,60 +64,65 @@ public class Auto extends Thread {
 	}
 
 	private void atualizaSensores() {
-		try {
-			if (!this.getSumo().isClosed()) {
+		synchronized(monitor){
+			try {
+				if (!this.getSumo().isClosed()) {
 
-				SumoPosition2D sumoPosition2D = (SumoPosition2D) sumo.do_job_get(Vehicle.getPosition(this.idAuto));
-				infoDistanceCompany = km.calcular(sumoPosition2D.toString()); //EXIGÊNCIA CALCULO LONG/LAT
+					SumoPosition2D sumoPosition2D = (SumoPosition2D) sumo.do_job_get(Vehicle.getPosition(this.idAuto));
+					infoDistanceCompany = km.calcular(sumoPosition2D.toString()); //EXIGÊNCIA CALCULO LONG/LAT
 
-				//System.out.println("AutoID: " + this.getIdAuto());
-				//System.out.println("RoadID: " + (String) this.sumo.do_job_get(Vehicle.getRoadID(this.idAuto)));
-				//System.out.println("RouteID: " + (String) this.sumo.do_job_get(Vehicle.getRouteID(this.idAuto)));
-				//System.out.println("RouteIndex: " + this.sumo.do_job_get(Vehicle.getRouteIndex(this.idAuto)));
-				
-				DrivingData _repport = new DrivingData(
-						this.idAuto, 
-						this.driverID, 
-						System.nanoTime(), //Timestamp 
-						sumoPosition2D.x, //posX
-						sumoPosition2D.y, //posY
-						(String) this.sumo.do_job_get(Vehicle.getRoadID(this.idAuto)), //actual edge 
-						(String) this.sumo.do_job_get(Vehicle.getRouteID(this.idAuto)), //actual route
-						(double) sumo.do_job_get(Vehicle.getSpeed(this.idAuto)), //speed
-						infoDistanceCompany, //traveled distance calculated from last step 
-						(double) sumo.do_job_get(Vehicle.getFuelConsumption(this.idAuto)), //Vehicle's fuel consumption in mg/s during this time step, to get the value for one step multiply with the step length						
-						1/*averageFuelConsumption (calcular)*/,
-						this.fuelType, 
-						this.fuelPrice,
-						(double) sumo.do_job_get(Vehicle.getCO2Emission(this.idAuto)), //Vehicle's CO2 emissions in mg/s during this time step, to get the value for one step multiply with the step length
-						(double) sumo.do_job_get(Vehicle.getHCEmission(this.idAuto)), // Vehicle's HC emissions in mg/s during this time step, to get the value for one step multiply with the step length						
-						this.personCapacity, // the total number of persons that can ride in this vehicle						
-						this.personNumber // the total number of persons which are riding in this vehicle
-				);
+					//System.out.println("AutoID: " + this.getIdAuto());
+					//System.out.println("RoadID: " + (String) this.sumo.do_job_get(Vehicle.getRoadID(this.idAuto)));
+					//System.out.println("RouteID: " + (String) this.sumo.do_job_get(Vehicle.getRouteID(this.idAuto)));
+					//System.out.println("RouteIndex: " + this.sumo.do_job_get(Vehicle.getRouteIndex(this.idAuto)));
+					
+					DrivingData _repport = new DrivingData(
+							this.idAuto, 
+							this.driverID, 
+							System.nanoTime(), //Timestamp 
+							sumoPosition2D.x, //posX
+							sumoPosition2D.y, //posY
+							(String) this.sumo.do_job_get(Vehicle.getRoadID(this.idAuto)), //actual edge 
+							(String) this.sumo.do_job_get(Vehicle.getRouteID(this.idAuto)), //actual route
+							(double) sumo.do_job_get(Vehicle.getSpeed(this.idAuto)), //speed
+							infoDistanceCompany, //traveled distance calculated from last step 
+							(double) sumo.do_job_get(Vehicle.getFuelConsumption(this.idAuto)), //Vehicle's fuel consumption in mg/s during this time step, to get the value for one step multiply with the step length						
+							1/*averageFuelConsumption (calcular)*/,
+							this.fuelType, 
+							this.fuelPrice,
+							(double) sumo.do_job_get(Vehicle.getCO2Emission(this.idAuto)), //Vehicle's CO2 emissions in mg/s during this time step, to get the value for one step multiply with the step length
+							(double) sumo.do_job_get(Vehicle.getHCEmission(this.idAuto)), // Vehicle's HC emissions in mg/s during this time step, to get the value for one step multiply with the step length						
+							this.personCapacity, // the total number of persons that can ride in this vehicle						
+							this.personNumber // the total number of persons which are riding in this vehicle
+					);
 
-				// Criar relatorio auditoria / alertas
+					// Criar relatorio auditoria / alertas
 
-				this.drivingRepport.add(_repport);
-				new Excel(_repport);
-				graph.addData(_repport.getCo2Emission(), "CO2 Emission", "Time");
+					this.drivingRepport.add(_repport);
+					new Excel(_repport);
+					//graph.addData(_repport.getCo2Emission(), "CO2 Emission", "Time");
 
-				sumo.do_job_set(Vehicle.setSpeedMode(this.idAuto, 0));
-				sumo.do_job_set(Vehicle.setSpeed(this.idAuto, 6.95));
+					sumo.do_job_set(Vehicle.setSpeedMode(this.idAuto, 0));
+					sumo.do_job_set(Vehicle.setSpeed(this.idAuto, 6.95));
 
-				// System.out.println("idAuto = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getAutoID());
-				// System.out.println("timestamp = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getTimeStamp());
-				// System.out.println("speed = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getSpeed());
-				// System.out.println("odometer = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getOdometer());
-				// System.out.println("Fuel Consumption = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getFuelConsumption());
-				// System.out.println("CO2 Emission = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getCo2Emission());
-				// System.out.println("getPersonNumber = " + sumo.do_job_get(Vehicle.getPersonNumber(this.idAuto)));
-				// System.out.println("************************");
+					// System.out.println("idAuto = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getAutoID());
+					// System.out.println("timestamp = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getTimeStamp());
+					// System.out.println("speed = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getSpeed());
+					// System.out.println("odometer = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getOdometer());
+					// System.out.println("Fuel Consumption = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getFuelConsumption());
+					// System.out.println("CO2 Emission = " + this.drivingRepport.get(this.drivingRepport.size() - 1).getCo2Emission());
+					// System.out.println("getPersonNumber = " + sumo.do_job_get(Vehicle.getPersonNumber(this.idAuto)));
+					// System.out.println("************************");
 
-			} else {
-				System.out.println("SUMO is closed...");
+					sensoresAtualizados = true;
+					monitor.notify();
+
+				} else {
+					System.out.println("SUMO is closed...");
+				}
+			} catch (Exception e) {
+				e.printStackTrace();
 			}
-		} catch (Exception e) {
-			e.printStackTrace();
 		}
 	}
 
@@ -145,6 +132,14 @@ public class Auto extends Thread {
 		buffWrite.close();
 	}*/
 
+	public void esperaSensores() throws InterruptedException{
+		synchronized (monitor){
+			while(!sensoresAtualizados){
+				monitor.wait();
+			}
+			sensoresAtualizados = false;
+		}
+	}
 
 	public boolean isOn_off() {
 		return this.on_off;
@@ -290,55 +285,55 @@ public class Auto extends Thread {
 	
 	}
 
-	public class RealTimeChart extends JFrame implements Runnable {
-		private DefaultCategoryDataset dataset;
+	// public class RealTimeChart extends JFrame implements Runnable {
+	// 	private DefaultCategoryDataset dataset;
 
-		public RealTimeChart(String title) {
-			dataset = new DefaultCategoryDataset();
-			JFreeChart chart = ChartFactory.createLineChart(
-					title,
-					"Time",
-					"Value",
-					dataset
-			);
+	// 	public RealTimeChart(String title) {
+	// 		dataset = new DefaultCategoryDataset();
+	// 		JFreeChart chart = ChartFactory.createLineChart(
+	// 				title,
+	// 				"Time",
+	// 				"Value",
+	// 				dataset
+	// 		);
 
-			ChartPanel chartPanel = new ChartPanel(chart);
-			chartPanel.setPreferredSize(new Dimension(560, 370));
-			add(chartPanel);
+	// 		ChartPanel chartPanel = new ChartPanel(chart);
+	// 		chartPanel.setPreferredSize(new Dimension(560, 370));
+	// 		add(chartPanel);
 
-			setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-			pack();
-			setVisible(true);
+	// 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+	// 		pack();
+	// 		setVisible(true);
 			
-			new Thread(this).start();
-    	}
+	// 		new Thread(this).start();
+    // 	}
 
-		@Override
-		public void run() {
-			while(true){
-			Timer timer = new Timer(1000, new ActionListener() {
-				@Override
-				public void actionPerformed(java.awt.event.ActionEvent e) {
-					// Atualize os dados aqui
-					// Suponha que você tenha uma lista chamada 'dados' que está sendo atualizada em
-					// algum lugar
-					for (int i = 0; i < drivingRepport.size(); i++) {
-						addData(drivingRepport.get(i).getCo2Emission(), "Série", "Categoria " + i);
-					}
-				}
-			});
+	// 	@Override
+	// 	public void run() {
+	// 		while(true){
+	// 		Timer timer = new Timer(1000, new ActionListener() {
+	// 			@Override
+	// 			public void actionPerformed(java.awt.event.ActionEvent e) {
+	// 				// Atualize os dados aqui
+	// 				// Suponha que você tenha uma lista chamada 'dados' que está sendo atualizada em
+	// 				// algum lugar
+	// 				for (int i = 0; i < drivingRepport.size(); i++) {
+	// 					addData(drivingRepport.get(i).getCo2Emission(), "Série", "Categoria " + i);
+	// 				}
+	// 			}
+	// 		});
 
-			timer.start();
-			try {
-				Thread.sleep(500);
-			} catch (Exception e) {e.printStackTrace();}
-			}
-		}
+	// 		timer.start();
+	// 		try {
+	// 			Thread.sleep(500);
+	// 		} catch (Exception e) {e.printStackTrace();}
+	// 		}
+	// 	}
 
-		public void addData(double value, String seriesKey, String categoryKey) {
-			dataset.addValue(value, seriesKey, categoryKey);
-			repaint();
-		}
-	}
+	// 	public void addData(double value, String seriesKey, String categoryKey) {
+	// 		dataset.addValue(value, seriesKey, categoryKey);
+	// 		repaint();
+	// 	}
+	// }
 
 }

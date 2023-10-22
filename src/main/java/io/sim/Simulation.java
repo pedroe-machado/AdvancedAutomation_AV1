@@ -3,7 +3,6 @@ package io.sim;
 import java.io.IOException;
 import java.util.ArrayList;
 
-import de.tudresden.sumo.objects.SumoColor;
 import it.polito.appeal.traci.SumoTraciConnection;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -18,7 +17,7 @@ public class Simulation extends Thread{
 
     public Simulation(){
 		ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-        scheduler.scheduleAtFixedRate(new PeriodicTask(), 5000, 500, TimeUnit.MILLISECONDS);     
+        scheduler.scheduleAtFixedRate(new PeriodicTask(), 3000, 500, TimeUnit.MILLISECONDS);     
 
 		/* SUMO */
 		String sumo_bin = "sumo-gui";		
@@ -29,13 +28,14 @@ public class Simulation extends Thread{
 		sumo.addOption("start", "1"); // auto-run on GUI show
 		sumo.addOption("quit-on-end", "1"); // auto-close on end
 
-        this.start();
     }
 
 	public void run() {
 		try {
 			sumo.runServer(12345);
 
+			fuelStation = FuelStation.getInstance(2);
+					
 			company = new Company(sumo);
 
 			ArrayList<String> users = company.getCLTs(); //Cria todas as contas no banco
@@ -43,11 +43,7 @@ public class Simulation extends Thread{
 			users.add("fuelStation");
 
 			alphaBank = new AlphaBank(users);
-
-			TransportService tS1 = new TransportService(true, "CAR1", i1, a1, sumo);
-			tS1.start();
-			Thread.sleep(5000);
-			a1.start();
+	
 
 		} catch (IOException e1) {
 			e1.printStackTrace();

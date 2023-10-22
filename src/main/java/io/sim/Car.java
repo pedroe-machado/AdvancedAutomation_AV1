@@ -7,7 +7,6 @@ import java.net.Socket;
 import java.net.UnknownHostException;
 
 import org.json.JSONObject;
-import org.json.simple.parser.JSONParser;
 
 import de.tudresden.sumo.cmd.Vehicle;
 import de.tudresden.sumo.objects.SumoColor;
@@ -15,6 +14,8 @@ import de.tudresden.sumo.objects.SumoStringList;
 import it.polito.appeal.traci.SumoTraciConnection;
 
 public class Car extends Thread{
+    private final Object monitor = new Object();
+    private boolean refresh=false;
 
     private boolean needFuel;
     private boolean abastecendo;
@@ -46,13 +47,14 @@ public class Car extends Thread{
         auto.start();
         while(true){
             try {
-                wait();
-                this.fuelTank -= (750000)/(((float)sumo.do_job_get(Vehicle.getFuelConsumption(idAuto)))*((float)acquisitionRate/1000)); // conversão mg/s -> L
+                auto.esperaSensores();
+                notificaRefresh();
+                double fuelConsumption = (Double) sumo.do_job_get(Vehicle.getFuelConsumption(idAuto));
+                this.fuelTank -= (750000)/(((float)fuelConsumption)*((float)acquisitionRate/1000)); // conversão mg/s -> L
                 new SendInfo().start();
                 if(fuelTank<=3 && !abastecendo){
                     needFuel = true;
                     sumo.do_job_set(Vehicle.setSpeed(idAuto, 0.0));
-                    //fuelStation
                 }
                 if(onFinalSpace()){
                     new AskRoute(currentRoute);
@@ -71,6 +73,13 @@ public class Car extends Thread{
             }
         }
     }
+    private void notificaRefresh(){
+        synchronized(monitor){
+            refresh = true;
+            monitor.notify();
+        }
+    }
+
     public boolean onFinalSpace() throws Exception{
         SumoStringList edges = currentRoute.getEdges();
         return sumo.do_job_get(Vehicle.getRoadID(idAuto)).equals(edges.get(edges.size()-2));        
@@ -102,18 +111,15 @@ public class Car extends Thread{
                 byte[] jsonBytes = jsonFlag.toString().getBytes();
                 byte[] encryptedData = CryptoUtils.encrypt(CryptoUtils.getStaticKey(), CryptoUtils.getStaticIV(),jsonBytes);
                 output.write(encryptedData);
-                output.close();
 
-                Thread.sleep(10);
+                Thread.sleep(300);
                 InputStream input = socket.getInputStream();
                 byte[] decryptedData = CryptoUtils.decrypt(CryptoUtils.getStaticKey(), CryptoUtils.getStaticIV(),input.readAllBytes());
-                Object obj = new JSONParser().parse(new String(decryptedData));
-                JSONObject jsonPackage = (JSONObject) obj;
+                JSONObject jsonPackage = new JSONObject((new String(decryptedData)));
 
-                input.close();
                 socket.close();
 
-                this.newRoute = new Route((String) jsonPackage.get("idRota"),(SumoStringList) jsonPackage.get("edges"));
+                this.newRoute = new Route(jsonPackage.getString("idRota"),(SumoStringList) jsonPackage.get("edges"));
                 currentRoute = newRoute;
                 theresNewRoute = true;
 
@@ -147,7 +153,6 @@ public class Car extends Thread{
                     byte[] jsonBytes = jsonFlag.toString().getBytes();
                     byte[] encryptedData = CryptoUtils.encrypt(CryptoUtils.getStaticKey(), CryptoUtils.getStaticIV(), jsonBytes);
                     output.write(encryptedData);
-                    output.close();
                     Thread.sleep(acquisitionRate);
                 } catch (Exception e){
                     System.out.println("sendinfo timing error");
@@ -192,4 +197,13 @@ public class Car extends Thread{
     public boolean theresNewRoute(){return theresNewRoute;}
 
     public void ackNewRoute(){theresNewRoute = false;}
+
+    public synchronized void sincronizaWaitCar() throws InterruptedException{
+		synchronized (monitor){
+			while(!refresh){
+				monitor.wait();
+			}
+			refresh = false;
+		}
+    }
 }

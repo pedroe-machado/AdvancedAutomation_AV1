@@ -7,54 +7,58 @@ import java.net.UnknownHostException;
 import java.util.ArrayList;
 
 import org.json.JSONObject;
-import org.json.simple.*;
-import org.json.simple.parser.JSONParser;
 
 import it.polito.appeal.traci.SumoTraciConnection;
 
-public class Driver implements Runnable{
+public class Driver extends Thread{
     
     private String idDriver;
     private String idConta;
     private String senha;
     private Car carro;
     private SumoTraciConnection sumo;
-    private Service currentService;
+    private TransportService currentService;
     private Route currentRoute;
     private ArrayList<Route> toDo;
     private ArrayList<Route> done;
 
     public Driver(SumoTraciConnection sumo, String id, Car _car){
+
         this.sumo = sumo;
         this.toDo = new ArrayList<>();
         this.done = new ArrayList<>(); 
         this.carro = _car;
         this.idDriver = this.idConta = this.senha = id;
-        new Thread(this).start();
     }
     @Override
     public void run() {
         while (carro.isAlive()) {
             if(carro.theresNewRoute()){
                 try {
-                    done.add(Integer.parseInt(currentRoute.getId()), currentRoute);
+                    done.add(Integer.parseInt(currentRoute.getId()), currentRoute); //adiciona rota finalizada
                     currentService.setOn(false);
                 } catch (Exception e) {}
                 currentRoute = carro.getCurrenRoute();
                 carro.ackNewRoute();
-                currentService = new Service(true, idConta, carro, sumo);
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                currentService = new TransportService(true, idConta, carro, sumo);
+                currentService.start();
             }
             while (!carro.doesNeedFuel() && !carro.theresNewRoute()) {
                 try {
-                    wait();
+                    carro.sincronizaWaitCar();
                 } catch (Exception e) {
                     System.out.println("driver sleep error");
                 }
             }
             try {
-                if(carro.doesNeedFuel()){
+                if(carro.doesNeedFuel() && !carro.abastecendo()){
                     carro.abastecendo(true);
-                    //Thread fuelStation
+                    FuelStation.getInstance(2).new FuelPumpThread(carro);
                     new BotPayment(idDriver);
                 }
             } catch (UnknownHostException e) {

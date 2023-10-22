@@ -16,12 +16,7 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
-import org.apache.logging.log4j.core.jmx.Server;
-import org.json.JSONException;
 import org.json.JSONObject;
-import org.json.simple.*;
-import org.json.simple.parser.JSONParser;
-import org.python.modules.synchronize;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -33,7 +28,7 @@ import de.tudresden.sumo.objects.SumoStringList;
 import it.polito.appeal.traci.SumoTraciConnection;
 
 public class Company implements Runnable {
-    public static String uriRoutesXML = "\\map\\map.rou.xml";
+    public static String uriRoutesXML = "map\\map.rou.xml";
 
     private CompanyServer server;
     private ArrayList<Car> carrosFirma;
@@ -49,15 +44,19 @@ public class Company implements Runnable {
         this.sumo = sumo;
         this.carrosFirma = new ArrayList<>();
         this.server = new CompanyServer();
+        this.avaliableRoutes = new ArrayList<Route>(); 
+        this.runningRoutes = new ArrayList<Route>();
+        this.finishedRoutes = new ArrayList<Route>();
+        this.carrosFirma = new ArrayList<Car>();
+        this.drivers = new ArrayList<Driver>();
 
-        for(int i=0; i<3; i++){ // Contratação de Drivers e cadastro de novos carros            
+        for(int i=0; i<1; i++){ // Contratação de Drivers e cadastro de novos carros            
             Car newCar = new Car(true, Integer.toString(i), new SumoColor(0, 255, 0, 126),Integer.toString(i),sumo,500,2,2,5.87,5,1);
             Driver newDriver = new Driver(sumo, Integer.toString(i), newCar);
 
             carrosFirma.add(i,newCar);
             drivers.add(i,newDriver);
         }
-
         //reconstructOriginalFile(); //testar se xml já foi limpo
         new Thread(this).start();
     }
@@ -74,9 +73,13 @@ public class Company implements Runnable {
         }
         
         server.start();
+
+        for (int i = 0; i <= carrosFirma.size()-1; i++) {
+            carrosFirma.get(i).start();
+            drivers.get(i).start();
+        }
+
         while(true){
-
-
             try {
                 Thread.sleep(100);
             } catch (InterruptedException e) {
@@ -120,38 +123,38 @@ public class Company implements Runnable {
                         routesList.add(new Route(Integer.toString(i), edgesList)); // Adiciona corrigindo idRotas descontínuo
                     }
                 }
-
             } catch (SAXException | IOException | ParserConfigurationException e) {
                 e.printStackTrace();
             }
-
             return routesList;
         }
-        private void limpaXml(){
-            try {
-                FileWriter fileWriter = new FileWriter(Company.uriRoutesXML);
-                fileWriter.write("");
-                fileWriter.close();
+        
+        // private void limpaXml(){
+        //     try {
+        //         FileWriter fileWriter = new FileWriter(Company.uriRoutesXML);
+        //         fileWriter.write("");
+        //         fileWriter.close();
 
-                FileWriter tempFileWriter = new FileWriter("\\data\\temp.xml");
-                tempFileWriter.write(""); 
-                tempFileWriter.close();
-                BufferedWriter writer = new BufferedWriter(new FileWriter("\\data\\temp.xml"));
+        //         FileWriter tempFileWriter = new FileWriter("\\data\\temp.xml");
+        //         tempFileWriter.write(""); 
+        //         tempFileWriter.close();
+        //         BufferedWriter writer = new BufferedWriter(new FileWriter("\\data\\temp.xml"));
 
-                for (Route route : avaliableRoutes) {
-                    writer.write("<vehicle id=\"" + route.getId() + "\" depart=\"0.00\">\n");
-                    writer.write("  <route edges=\"" + String.join(" ", route.getEdges()) + "\"/>\n");
-                    writer.write("</vehicle>\n");
-                }
+        //         for (Route route : avaliableRoutes) {
+        //             writer.write("<vehicle id=\"" + route.getId() + "\" depart=\"0.00\">\n");
+        //             writer.write("  <route edges=\"" + String.join(" ", route.getEdges()) + "\"/>\n");
+        //             writer.write("</vehicle>\n");
+        //         }
 
-                writer.close();
-                System.out.println("Arquivo XML esvaziado com sucesso. Dados transferidos para temp.xml");  
+        //         writer.close();
+        //         System.out.println("Arquivo XML esvaziado com sucesso. Dados transferidos para temp.xml");  
 
-            } catch (IOException e) {
-                e.printStackTrace();
-                System.out.println("Erro ao esvaziar o arquivo XML.");
-            }
-        }
+        //     } catch (IOException e) {
+        //         e.printStackTrace();
+        //         System.out.println("Erro ao esvaziar o arquivo XML.");
+        //     }
+        // }
+        
         public ArrayList<Route> getRoutes(){
             return routes;
         }
@@ -186,55 +189,33 @@ public class Company implements Runnable {
      * cada solicitação de serviço é tratada em uma nova thread ClientHandler
      * @apiNote As conexões com o CompanyServer devem ser feitas na porta:20181
     */
-    private class CompanyServer extends Thread{
-        private ServerSocket serverSocket;
+    private class CompanyServer extends Service{
 
         public CompanyServer() throws UnknownHostException, IOException{
-            serverSocket = new ServerSocket(20181);
+            super(20181);
         }
+
         @Override
-        public void run() {
-            while (true) {
-                try {
-                    Socket clientSocket = serverSocket.accept(); // Aceita uma nova conexão
-                    new ClientHandler(clientSocket).start(); // Inicia uma nova thread para lidar com o cliente
-                    Thread.sleep(100);
-                } catch (IOException | InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
+        public Server CreateServerThread(Socket conn) {
+            return new ClientHandler(conn);
         }
     }
-    private class ClientHandler extends Thread {
-        private Socket clientSocket;
+    private class ClientHandler extends Server {
 
-        public ClientHandler(Socket clientSocket) {
-            this.clientSocket = clientSocket;
+        public ClientHandler(Socket con) {
+            super(con);
         }
         @Override
-        public void run() {
+        protected void ProcessMessage(String jsonString){
             try {
-                InputStream inputStream = clientSocket.getInputStream();
-                byte[] encryptedData = inputStream.readAllBytes();
-                // Descriptografa os dados
-                byte[] decryptedData = CryptoUtils.decrypt(CryptoUtils.getStaticKey(), CryptoUtils.getStaticIV(), encryptedData);
-
-                JSONParser parser = new JSONParser();
-                Object obj = parser.parse(new String(decryptedData));
-                JSONObject jsonObject = (JSONObject) obj;
-                inputStream.close();
-
-                OutputStream outputStream = clientSocket.getOutputStream();
-                if (jsonObject.get("servico").equals("REQUEST_ROUTE")) {
-                    // new route handler sincronized thread NEW SERVICE
+                byte[] decryptedData = CryptoUtils.decrypt(CryptoUtils.getStaticKey(), CryptoUtils.getStaticIV(), jsonString.getBytes());
+                JSONObject jsonObject = new JSONObject((new String(decryptedData)));
+                
+                if (jsonObject.getString("servico").equals("REQUEST_ROUTE")) {
                     new ManageRoute(clientSocket, jsonObject);
-                } else if (jsonObject.get("servico").equals("SEND_INFO")) {
+                } else if (jsonObject.getString("servico").equals("SEND_INFO")) {
                     new CalculaKm(jsonObject);
                 }
-
-                outputStream.close();
-                clientSocket.close();
-
             } catch (IOException e) {
                 e.printStackTrace();
             } catch (Exception e) {
@@ -286,7 +267,6 @@ public class Company implements Runnable {
                 byte[] jsonBytes = jsonRoute.toString().getBytes();
                 byte[] encryptedData = CryptoUtils.encrypt(CryptoUtils.getStaticKey(), CryptoUtils.getStaticIV(), jsonBytes);
                 output.write(encryptedData);
-                output.close();
                 carSocket.close();
             } catch (Exception e) {
                 e.printStackTrace();
@@ -312,8 +292,8 @@ public class Company implements Runnable {
 
         public CalculaKm(JSONObject jsonObject){
             controlMap = getInstanciaMapa();
-            idAuto = (String)jsonObject.get("idAuto");
-            double newDistancia = (double)jsonObject.get("km");
+            idAuto = jsonObject.getString("idAuto");
+            double newDistancia = jsonObject.getDouble("km");
             try {
                 attMap(idAuto, newDistancia);
                 this.start();
@@ -347,7 +327,6 @@ public class Company implements Runnable {
             }       
         }
     }
-
 
     /**
      * Thread BotPayment que realiza um pagamento ao driver que completou 1km
@@ -384,8 +363,7 @@ public class Company implements Runnable {
             }
         }
     }
-    
-    
+      
     public ArrayList<String> getCLTs(){
         ArrayList<String> listaCLT = new ArrayList<>();
         for (Driver clt: drivers) {
@@ -406,4 +384,7 @@ public class Company implements Runnable {
         return avaliableRoutes;
     }
 
+    public SumoTraciConnection getSumo() {
+        return sumo;
+    }
 }

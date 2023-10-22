@@ -1,43 +1,45 @@
-package io.sim;
+// package io.sim;
 
-import java.io.*;
-import java.net.*;
-import org.json.simple.*;
-import org.json.simple.parser.*;
+// import java.io.*;
+// import java.net.*;
+// import org.json.simple.*;
+// import org.json.simple.parser.*;
 
-public class Servidor extends Thread {
+// import net.CryptoUtils;
 
-    private Socket clientSocket;
-    private byte[] key;  // Chave de criptografia
-    private byte[] iv;   // Vetor de inicialização
+// public class Servidor extends Thread {
 
-    public Servidor(Socket socket, byte[] key, byte[] iv) {
-        this.clientSocket = socket;
-        this.key = key;
-        this.iv = iv;
-    }
+//     private Socket clientSocket;
+//     private byte[] key;  // Chave de criptografia
+//     private byte[] iv;   // Vetor de inicialização
 
-    @Override
-    public void run() {
-        try {
-            InputStream input = clientSocket.getInputStream();
-            byte[] encryptedData = input.readAllBytes();
+//     public Servidor(Socket socket, byte[] key, byte[] iv) {
+//         this.clientSocket = socket;
+//         this.key = key;
+//         this.iv = iv;
+//     }
 
-            // Descriptografa os dados
-            byte[] decryptedData = CryptoUtils.decrypt(key, iv, encryptedData);
+//     @Override
+//     public void run() {
+//         try {
+//             InputStream input = clientSocket.getInputStream();
+//             byte[] encryptedData = input.readAllBytes();
 
-            JSONParser parser = new JSONParser();
-            Object obj = parser.parse(new String(decryptedData));
-            JSONObject jsonObject = (JSONObject) obj;
+//             // Descriptografa os dados
+//             byte[] decryptedData = CryptoUtils.decrypt(key, iv, encryptedData);
 
-            // Processa o arquivo JSON aqui
-            System.out.println("Recebido do cliente: " + jsonObject.toJSONString());
+//             JSONParser parser = new JSONParser();
+//             Object obj = parser.parse(new String(decryptedData));
+//             JSONObject jsonObject = (JSONObject) obj;
 
-            input.close();
-            clientSocket.close();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
+//             // Processa o arquivo JSON aqui
+//             System.out.println("Recebido do cliente: " + jsonObject.toJSONString());
 
-}
+//             input.close();
+//             clientSocket.close();
+//         } catch (Exception e) {
+//             e.printStackTrace();
+//         }
+//     }
+
+// }

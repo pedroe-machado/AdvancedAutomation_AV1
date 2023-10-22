@@ -1,14 +1,8 @@
 package io.sim;
 
-/**
- * Hello world
- *
- */
 public class App {
     public static void main( String[] args ) {
-
-        EnvSimulator ev = new EnvSimulator();
+        Simulation ev = new Simulation();
         ev.start();
-
     }
 }

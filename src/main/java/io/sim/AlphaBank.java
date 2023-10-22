@@ -11,8 +11,6 @@ import java.util.HashMap;
 
 import org.json.JSONException;
 import org.json.JSONObject;
-import org.json.simple.parser.JSONParser;
-
 /**
  * - Classe (Thread) que implementa o AlphaBank -
  * 
@@ -47,8 +45,7 @@ public class AlphaBank implements Runnable{
             try {
                 Socket clientSocket = serverSocket.accept(); // Aceita uma nova conexão
                 new Transferencia(clientSocket).start(); // Inicia uma nova thread para lidar com o cliente
-                Thread.sleep(100);
-            } catch (IOException | InterruptedException e) {
+            } catch (IOException e) {
                 e.printStackTrace();
             }
         }
@@ -78,9 +75,7 @@ public class AlphaBank implements Runnable{
                 byte[] encryptedData = input.readAllBytes();
                 byte[] decryptedData = CryptoUtils.decrypt(CryptoUtils.getStaticKey(), CryptoUtils.getStaticIV(), encryptedData);
 
-                JSONParser parser = new JSONParser();
-                Object obj = parser.parse(new String(decryptedData));
-                JSONObject dadosTranferencia = (JSONObject) obj;
+                JSONObject dadosTranferencia = new JSONObject((new String(decryptedData)));
 
                 input.close();
 
@@ -122,10 +117,6 @@ public class AlphaBank implements Runnable{
     
         public synchronized double getSaldo(){
             return saldo;
-        }
-        
-        public String getIdConta(){
-            return idConta;
         }
     
         public synchronized void recebe(double valor){

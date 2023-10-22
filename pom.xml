@@ -47,21 +47,15 @@
     </dependency>
 
     <dependency>
-      <groupId>org.json</groupId>
-      <artifactId>json</artifactId>
-      <version>20231013</version>
+        <groupId>org.apache.poi</groupId>
+        <artifactId>poi-ooxml</artifactId>
+        <version>5.0.0</version>
     </dependency>
 
     <dependency>
       <groupId>org.apache.poi</groupId>
       <artifactId>poi</artifactId>
-      <version>5.2.4</version>
-    </dependency>
-
-    <dependency>
-      <groupId>org.python</groupId>
-      <artifactId>jython-slim</artifactId>
-      <version>2.7.3</version>
+      <version>5.0.0</version>
     </dependency>
 
     <dependency>
@@ -70,11 +64,11 @@
       <version>1.1</version>  
     </dependency>
 
-    <dependency>
+    <!-- <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
       <version>2.0.7</version>
-    </dependency>
+    </dependency> -->
 
 		<dependency>
 			<groupId>xerces</groupId>
@@ -135,14 +129,7 @@
       <artifactId>TraaS</artifactId>
       <version>TraaS</version>
     </dependency>
- 
-    <dependency>
-        <groupId>org.python</groupId>
-        <artifactId>jython-slim</artifactId>
-        <version>2.7.3</version>
-    </dependency>
 
-  
     <dependency>
       <groupId>xml-apis</groupId>
       <artifactId>xml-apis</artifactId>
@@ -201,6 +188,13 @@
   
 
     <dependencies>
+
+      <dependency>
+        <groupId>org.apache.poi</groupId>
+        <artifactId>poi</artifactId>
+        <version>5.0.0</version>
+      </dependency>
+
 
       <dependency>
         <groupId>org.ow2.asm</groupId>

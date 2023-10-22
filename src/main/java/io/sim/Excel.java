@@ -1,25 +1,21 @@
 package io.sim;
 
-import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
-import org.apache.poi.hssf.usermodel.HSSFSheet;
-import org.apache.poi.hssf.usermodel.HSSFWorkbook;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 public class Excel extends Thread{
 
-    private static final String fileName = "/data/Relatorio.xls";
-    private static HSSFWorkbook workbook;
-    private HSSFSheet sheet;
+    private static final String fileName = "\\data\\Relatorio.xls";
+    private static XSSFWorkbook workbook;
+    private Sheet sheet;
     private DrivingData repport;
 
     public Excel(DrivingData repport){
         this.repport = repport;
-        workbook = new HSSFWorkbook();
+        workbook = new XSSFWorkbook();
         this.start();
     }
 
@@ -28,9 +24,10 @@ public class Excel extends Thread{
 
         try {
             this.sheet = workbook.getSheet(repport.getAutoID());
-        } catch (Exception e) {
-            this.sheet = workbook.createSheet(repport.getAutoID());
-        }
+            if (this.sheet == null) {
+                this.sheet = workbook.createSheet(repport.getAutoID());
+            }
+        } catch (Exception e) {}
 
         int rownum = 0;{
             Row row = sheet.createRow(rownum++);
@@ -66,18 +63,17 @@ public class Excel extends Thread{
             cellLatitude.setCellValue(repport.getLatitude());
         }
 
-        try {
-            FileOutputStream out = new FileOutputStream(new File(Excel.fileName));
+        try (FileOutputStream out = new FileOutputStream(Excel.fileName)) {
             workbook.write(out);
-            out.close();
             System.out.println("Arquivo Excel criado com sucesso!");
-
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-            System.out.println("Arquivo não encontrado!");
         } catch (IOException e) {
             e.printStackTrace();
-            System.out.println("Erro na edição do arquivo!");
+        } finally {
+            try {
+                workbook.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 }
