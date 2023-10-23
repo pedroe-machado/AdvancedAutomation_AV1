@@ -3,7 +3,6 @@ package io.sim;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
-
 public abstract class Service extends Thread{
     protected ArrayList<Server> connections;
     protected ServerSocket socket;

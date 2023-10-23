@@ -1,5 +1,6 @@
 package io.sim;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tudresden.sumo.objects.SumoStringList;
 import de.tudresden.sumo.util.SumoCommand;
 
@@ -44,5 +45,27 @@ public class Route {
 
    public static SumoCommand add(String routeID, SumoStringList edges) {
       return new SumoCommand(198, 128, routeID, edges);
+   }
+
+   public String toJson() {
+      try {
+         ObjectMapper mapper = new ObjectMapper();
+         return mapper.writeValueAsString(this);
+      } catch (Exception e) {
+         System.out.println("erro ao converter Route>JSON");
+         e.printStackTrace(); 
+         return null;
+      }
+   }
+
+   public static Route fromJson(String json) {
+      try {
+         ObjectMapper mapper = new ObjectMapper();
+         return mapper.readValue(json, Route.class);
+      } catch (Exception e) {
+         System.out.println("erro ao converter JSON>Route");
+         e.printStackTrace(); 
+         return null;
+      }
    }
 }

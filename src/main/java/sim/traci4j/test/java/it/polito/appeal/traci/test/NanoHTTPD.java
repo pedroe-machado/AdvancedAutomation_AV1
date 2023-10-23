@@ -359,7 +359,7 @@ public class NanoHTTPD {
                             break;
                     }
                 }
-                return new String(sb.toString().getBytes());
+                return new String(sb.toString().getBytes("UTF-8"));
             } catch (Exception e) {
                 sendError(HTTP_BADREQUEST, "BAD REQUEST: Bad percent-encoding.");
                 return null;

@@ -24,7 +24,7 @@
 //             OutputStream output = socket.getOutputStream();
 
 //             // Converte o JSON em bytes
-//             byte[] jsonBytes = jsonObject.toJSONString().getBytes();
+//             byte[] jsonBytes = jsonObject.toJSONString().getBytes("UTF-8");
 
 //             // Criptografa os dados
 //             byte[] encryptedData = CryptoUtils.encrypt(key, iv, jsonBytes);

@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
-
 import org.json.JSONObject;
 
 public class Client {
@@ -21,35 +20,27 @@ public class Client {
             e.printStackTrace();
         }
     }
-
-    public void SendMessage(JSONObject jsonObject) {        
+    public void SendMessage(JSONObject jsonObject) {      
         try {
-            byte[] jsonBytes = jsonObject.toString().getBytes();
-            byte[] encryptedData = CryptoUtils.encrypt(CryptoUtils.getStaticKey(), CryptoUtils.getStaticIV(), jsonBytes); 
-            writer.write(encryptedData);
-            writer.flush();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    public String Listen() {
-        String message = "";
-        try {
-            if (reader.available() <= 0) {
-                byte[] buffer = new byte[1024];
-                int read = reader.read(buffer);
-                if (read > 0) {
-                    message = new String(buffer, 0, read);
-                    return message;
-                }
+            byte[] jsonBytes = jsonObject.toString().getBytes("UTF-8");
+            //byte[] encryptedData = CryptoUtils.encrypt(CryptoUtils.getStaticKey(), CryptoUtils.getStaticIV(), jsonBytes); 
+            System.out.println("sentmessage: " + jsonObject.toString());
+            if(jsonBytes!=null ){
+                writer.write(jsonBytes);
+                writer.flush();
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
-        return message;
     }
+    public JSONObject Listen() throws Exception {
+        byte[] message = reader.readAllBytes();
+        //byte[] decryptedData = CryptoUtils.decrypt(CryptoUtils.getStaticKey(), CryptoUtils.getStaticIV(), message);
+        
+        JSONObject jsonObject = new JSONObject((new String(message)));
 
+        return jsonObject;
+    }
     public void Close() throws IOException {
         socket.close();
     }

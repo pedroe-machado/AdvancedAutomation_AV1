@@ -11,6 +11,8 @@ import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.Queue;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -27,14 +29,13 @@ import de.tudresden.sumo.objects.SumoColor;
 import de.tudresden.sumo.objects.SumoStringList;
 import it.polito.appeal.traci.SumoTraciConnection;
 
-public class Company implements Runnable {
+public class Company extends Thread{
     public static String uriRoutesXML = "map\\map.rou.xml";
 
     private CompanyServer server;
     private ArrayList<Car> carrosFirma;
     private ArrayList<Driver> drivers;
-
-    private ArrayList<Route> avaliableRoutes;
+    private Queue<Route> avaliableRoutes;
     private ArrayList<Route> runningRoutes;
     private ArrayList<Route> finishedRoutes;
 
@@ -44,22 +45,15 @@ public class Company implements Runnable {
         this.sumo = sumo;
         this.carrosFirma = new ArrayList<>();
         this.server = new CompanyServer();
-        this.avaliableRoutes = new ArrayList<Route>(); 
-        this.runningRoutes = new ArrayList<Route>();
+        this.avaliableRoutes = new LinkedList<>();
+        this.runningRoutes = new ArrayList<Route>(900);
         this.finishedRoutes = new ArrayList<Route>();
         this.carrosFirma = new ArrayList<Car>();
         this.drivers = new ArrayList<Driver>();
 
-        for(int i=0; i<1; i++){ // Contratação de Drivers e cadastro de novos carros            
-            Car newCar = new Car(true, Integer.toString(i), new SumoColor(0, 255, 0, 126),Integer.toString(i),sumo,500,2,2,5.87,5,1);
-            Driver newDriver = new Driver(sumo, Integer.toString(i), newCar);
-
-            carrosFirma.add(i,newCar);
-            drivers.add(i,newDriver);
-        }
-        //reconstructOriginalFile(); //testar se xml já foi limpo
-        new Thread(this).start();
+        this.start();
     }
+    
     @Override
     public void run() {
 
@@ -71,15 +65,22 @@ public class Company implements Runnable {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-        
+        for (int i = 0; i < 1; i++) { // Contratação de Drivers e cadastro de novos carros
+            try {
+                Car newCar = new Car(true, Integer.toString(i), new SumoColor(0, 255, 0, 126), Integer.toString(i), sumo,
+                        500, 2, 2, 5.87, 5, 1);
+                carrosFirma.add(i, newCar);
+                Driver newDriver = new Driver(sumo, Integer.toString(i), newCar);
+                drivers.add(i, newDriver);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
         server.start();
 
         for (int i = 0; i <= carrosFirma.size()-1; i++) {
             carrosFirma.get(i).start();
             drivers.get(i).start();
-        }
-
-        while(true){
             try {
                 Thread.sleep(100);
             } catch (InterruptedException e) {
@@ -94,15 +95,15 @@ public class Company implements Runnable {
      * antes que o simulador seja executado novamente via reconstructOriginalFile();
      */
     private class CreateRoutes extends Thread{
-        private ArrayList<Route> routes;
+        private Queue<Route> routes;
 
         @Override
         public void run(){
             this.routes = parseRoutes();
             //limpaXml();
         }
-        private ArrayList<Route> parseRoutes() {         
-            ArrayList<Route> routesList = new ArrayList<>();
+        private Queue<Route> parseRoutes() {         
+            Queue<Route> routesQueue = new LinkedList<>();
             try {
                 DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
                 DocumentBuilder builder = factory.newDocumentBuilder();
@@ -120,13 +121,13 @@ public class Company implements Runnable {
                         for (String edge : edgesArray) {
                             edgesList.add(edge);
                         }
-                        routesList.add(new Route(Integer.toString(i), edgesList)); // Adiciona corrigindo idRotas descontínuo
+                        routesQueue.add(new Route(Integer.toString(i), edgesList)); // Adiciona corrigindo idRotas descontínuo
                     }
                 }
             } catch (SAXException | IOException | ParserConfigurationException e) {
                 e.printStackTrace();
             }
-            return routesList;
+            return routesQueue;
         }
         
         // private void limpaXml(){
@@ -155,7 +156,7 @@ public class Company implements Runnable {
         //     }
         // }
         
-        public ArrayList<Route> getRoutes(){
+        public Queue<Route> getRoutes(){
             return routes;
         }
     }
@@ -190,35 +191,35 @@ public class Company implements Runnable {
      * @apiNote As conexões com o CompanyServer devem ser feitas na porta:20181
     */
     private class CompanyServer extends Service{
-
         public CompanyServer() throws UnknownHostException, IOException{
             super(20181);
         }
-
         @Override
         public Server CreateServerThread(Socket conn) {
             return new ClientHandler(conn);
         }
     }
     private class ClientHandler extends Server {
+        private Socket conn;
 
-        public ClientHandler(Socket con) {
-            super(con);
+        public ClientHandler(Socket conn) {
+            super(conn);
+            this.conn = conn;
         }
         @Override
         protected void ProcessMessage(String jsonString){
             try {
-                byte[] decryptedData = CryptoUtils.decrypt(CryptoUtils.getStaticKey(), CryptoUtils.getStaticIV(), jsonString.getBytes());
-                JSONObject jsonObject = new JSONObject((new String(decryptedData)));
+                //byte[] decryptedData = CryptoUtils.decrypt(CryptoUtils.getStaticKey(), CryptoUtils.getStaticIV(), jsonString.getBytes("UTF-8"));
                 
+                JSONObject jsonObject = new JSONObject(jsonString);
+
                 if (jsonObject.getString("servico").equals("REQUEST_ROUTE")) {
-                    new ManageRoute(clientSocket, jsonObject);
+                    new ManageRoute(conn, jsonObject);
                 } else if (jsonObject.getString("servico").equals("SEND_INFO")) {
                     new CalculaKm(jsonObject);
                 }
-            } catch (IOException e) {
-                e.printStackTrace();
             } catch (Exception e) {
+                System.out.println(jsonString);
                 e.printStackTrace();
             }
         }
@@ -232,26 +233,27 @@ public class Company implements Runnable {
      * 
      * @return Route a ser atribuida a um novo Service 
      */
-    private class ManageRoute extends Thread{
+    private class ManageRoute extends Server{
         private JSONObject jsonRoute;
         private boolean resumedRoute;
         private Route routeFinalizada;
-        private Socket carSocket;
 
         public ManageRoute(Socket connection, JSONObject jsonObject) {
+            super(connection);
             resumedRoute = true;
-            carSocket = connection;
             jsonRoute = new JSONObject();
             try {
-                routeFinalizada = (Route) jsonObject.get("routeFinished");
+                routeFinalizada = Route.fromJson(jsonObject.get("route").toString());
             } catch (Exception e) {
+                System.out.println("primeira rota");
                 resumedRoute = false;
             }
             this.start();
         }
         private synchronized void reorganize(){
             try{
-                Route auxRoute = getRoutesAccess().remove(getRoutesAccess().size()-1);
+                Route auxRoute = getRoutesAccess().poll();
+                System.out.println(Integer.parseInt(auxRoute.getId()) + " ! " + getRunningAccess().size());
                 getRunningAccess().add(Integer.parseInt(auxRoute.getId()), auxRoute);
                 this.jsonRoute.put("rota",auxRoute);
                 if(resumedRoute){
@@ -260,23 +262,14 @@ public class Company implements Runnable {
             } catch (NullPointerException e){
                 System.out.println("erro ao acessar lista");
             }
-        }                             
-        private void sendRoute(){
-            try {
-                OutputStream output = carSocket.getOutputStream();
-                byte[] jsonBytes = jsonRoute.toString().getBytes();
-                byte[] encryptedData = CryptoUtils.encrypt(CryptoUtils.getStaticKey(), CryptoUtils.getStaticIV(), jsonBytes);
-                output.write(encryptedData);
-                carSocket.close();
-            } catch (Exception e) {
-                e.printStackTrace();
-                System.out.println("erro ao enviar rota");
-            }
         }
         @Override
         public void run(){
             reorganize();
-            sendRoute();
+            SendMessage(jsonRoute);
+        }
+        @Override
+        protected void ProcessMessage(String message) {
         }
     }
 
@@ -284,8 +277,7 @@ public class Company implements Runnable {
      * Thread que gerencia o deslocamento de cada Car associado
      * @param jsonObject recebido pelo Company Server 
      */
-    private class CalculaKm extends Thread{        
-        private boolean singleMap;
+    private class CalculaKm extends Thread{
         private String idAuto;
         private double distance;
         private static HashMap<String,Double> controlMap;
@@ -293,22 +285,24 @@ public class Company implements Runnable {
         public CalculaKm(JSONObject jsonObject){
             controlMap = getInstanciaMapa();
             idAuto = jsonObject.getString("idAuto");
-            double newDistancia = jsonObject.getDouble("km");
+            
             try {
+                double newDistancia = (Double)(jsonObject.get("km"));
                 attMap(idAuto, newDistancia);
                 this.start();
             } catch (NullPointerException e) {
                 System.out.println("error mapa de distancias");
+            } catch (ClassCastException e){
             }
         }
         private synchronized HashMap<String,Double> getInstanciaMapa() {
-            if(!singleMap){ 
-                singleMap = true;
+            if(controlMap==null){ 
                 return new HashMap<>();
             }
             return controlMap;
         }
         private synchronized void attMap(String idAuto, double newDistance){
+            System.out.println("atualizando mapa:"+ idAuto + " " + distance );
             distance = controlMap.get(idAuto);
             distance += newDistance;
             controlMap.put(idAuto,distance);
@@ -333,11 +327,11 @@ public class Company implements Runnable {
      * @param idDriver que irá receber a transferência
      */
     private class BotPayment extends Thread {
-        private Socket socket;
+        private Client client;
         private JSONObject jsonObject;
 
         public BotPayment(String idDriver) throws UnknownHostException, IOException{
-            this.socket = new Socket("127.0.0.1", 20180);
+            this.client = new Client("127.0.0.1", 20180);
             this.jsonObject = new JSONObject();
             this.jsonObject.put("idConta", "company");
             this.jsonObject.put("senha", "company");
@@ -348,17 +342,9 @@ public class Company implements Runnable {
         @Override
         public void run() {
             try {
-                OutputStream output = socket.getOutputStream();
-                // Converte o JSON em bytes
-                byte[] jsonBytes = jsonObject.toString().getBytes();
-                // Criptografa os dados
-                byte[] encryptedData = CryptoUtils.encrypt(CryptoUtils.getStaticKey(), CryptoUtils.getStaticIV(), jsonBytes);
-                // Envia os dados criptografados para o servidor
-                output.write(encryptedData);
-
-                output.close();
-                socket.close();
+                client.SendMessage(jsonObject);
             } catch (Exception e) {
+                System.out.println("falha no pagamento do driver");
                 e.printStackTrace();
             }
         }
@@ -380,7 +366,7 @@ public class Company implements Runnable {
         return finishedRoutes;
     }
     
-    private synchronized ArrayList<Route> getRoutesAccess(){
+    private synchronized Queue<Route> getRoutesAccess(){
         return avaliableRoutes;
     }
 

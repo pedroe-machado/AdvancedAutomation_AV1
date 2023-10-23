@@ -23,7 +23,6 @@ public class Car extends Thread{
     private float fuelTank;
     private Route currentRoute;
     private SumoTraciConnection sumo;
-
 	private Auto auto;
     private String idAuto;
     private long acquisitionRate;
@@ -50,9 +49,11 @@ public class Car extends Thread{
                 auto.esperaSensores();
                 notificaRefresh();
                 double fuelConsumption = (Double) sumo.do_job_get(Vehicle.getFuelConsumption(idAuto));
-                this.fuelTank -= (750000)/(((float)fuelConsumption)*((float)acquisitionRate/1000)); // conversão mg/s -> L
-                new SendInfo().start();
+                this.fuelTank -= (((float)fuelConsumption)*((float)acquisitionRate/1000))/(750000); // conversão mg/s -> L
+                new SendInfo();
+                
                 if(fuelTank<=3 && !abastecendo){
+                    System.out.println(idAuto+" precisa abastecer");
                     needFuel = true;
                     sumo.do_job_set(Vehicle.setSpeed(idAuto, 0.0));
                 }
@@ -62,8 +63,6 @@ public class Car extends Thread{
                 }
             } catch (UnknownHostException e) {
                 System.out.println("sendinfo error");
-                e.printStackTrace();
-            } catch (IOException e) {
                 e.printStackTrace();
             } catch (InterruptedException e) {
                 System.out.println("car wait error");
@@ -81,24 +80,26 @@ public class Car extends Thread{
     }
 
     public boolean onFinalSpace() throws Exception{
+        if(currentRoute==null) return false;
         SumoStringList edges = currentRoute.getEdges();
         return sumo.do_job_get(Vehicle.getRoadID(idAuto)).equals(edges.get(edges.size()-2));        
     }
 
     // Comunicação com a Company e RouteHandler
+
     private class AskRoute extends Thread {
-        private Socket socket;
+        private Client clientComp;
         private JSONObject jsonFlag;
         private Route newRoute;
 
         public AskRoute() throws UnknownHostException, IOException {
-            this.socket = new Socket("127.0.0.1", 20181);
+            this.clientComp = new Client("127.0.0.1", 20181);
             this.jsonFlag = new JSONObject();
             this.jsonFlag.put("servico", "REQUEST_ROUTE");
             this.start();
         }
         public AskRoute(Route finished) throws UnknownHostException, IOException{
-            this.socket = new Socket("127.0.0.1", 20181);
+            this.clientComp = new Client("127.0.0.1", 20181);
             this.jsonFlag = new JSONObject();
             this.jsonFlag.put("servico", "REQUEST_ROUTE");
             this.jsonFlag.put("finishedRoute",finished);
@@ -107,22 +108,17 @@ public class Car extends Thread{
         @Override
         public void run() {
             try {
-                OutputStream output = socket.getOutputStream();
-                byte[] jsonBytes = jsonFlag.toString().getBytes();
-                byte[] encryptedData = CryptoUtils.encrypt(CryptoUtils.getStaticKey(), CryptoUtils.getStaticIV(),jsonBytes);
-                output.write(encryptedData);
+                clientComp.SendMessage(jsonFlag);
 
-                Thread.sleep(300);
-                InputStream input = socket.getInputStream();
-                byte[] decryptedData = CryptoUtils.decrypt(CryptoUtils.getStaticKey(), CryptoUtils.getStaticIV(),input.readAllBytes());
-                JSONObject jsonPackage = new JSONObject((new String(decryptedData)));
-
-                socket.close();
+                Thread.sleep(100);
+                
+                JSONObject jsonPackage = clientComp.Listen();
 
                 this.newRoute = new Route(jsonPackage.getString("idRota"),(SumoStringList) jsonPackage.get("edges"));
+                System.out.println(jsonPackage.getString("idRota")+jsonPackage.get("edges"));
+
                 currentRoute = newRoute;
                 theresNewRoute = true;
-
             } catch (Exception e) {
                 System.out.println("aksroute com problema");
                 e.printStackTrace();
@@ -130,30 +126,28 @@ public class Car extends Thread{
         }
     }
     private class SendInfo extends Thread {
-        private Socket socket;
-        private JSONObject jsonFlag;
+        private Client infoClient;
+        private JSONObject jsonPack;
 
         public SendInfo() throws IOException {
             try {
-                this.socket = new Socket("127.0.0.1", 20181);
-                this.jsonFlag = new JSONObject();
-                this.jsonFlag.put("servico", "SEND_INFO");
-                this.jsonFlag.put("idAuto", idAuto);
-                this.jsonFlag.put("km", auto.getLastDistance());
+                this.infoClient = new Client("127.0.0.1", 20181);
+                this.jsonPack = new JSONObject();
+                this.jsonPack.put("servico", "SEND_INFO");
+                this.jsonPack.put("idAuto", idAuto);
+                this.jsonPack.put("km", Double.toString(auto.getLastDistance()));
+                this.jsonPack.put("report", auto.getLastRepport());
                 this.start();
-            } catch (UnknownHostException e) {
+            } catch (Exception e) {
                 System.out.println("error company server-sendinfo");
             }
         }
         @Override
         public void run() {
-            while(auto.isOn_off()){
-                try {                
-                    OutputStream output = socket.getOutputStream();
-                    byte[] jsonBytes = jsonFlag.toString().getBytes();
-                    byte[] encryptedData = CryptoUtils.encrypt(CryptoUtils.getStaticKey(), CryptoUtils.getStaticIV(), jsonBytes);
-                    output.write(encryptedData);
-                    Thread.sleep(acquisitionRate);
+            if(auto.isOn_off()){
+                try {
+                    System.out.println("car sending: " + jsonPack.toString());                
+                    infoClient.SendMessage(jsonPack);
                 } catch (Exception e){
                     System.out.println("sendinfo timing error");
                 }
@@ -180,7 +174,10 @@ public class Car extends Thread{
 
     public boolean abastecendo(){return abastecendo;}
 
-    public void abastecendo(boolean _abastecendo){abastecendo = _abastecendo;}
+    public void abastecendo(boolean _abastecendo){
+        abastecendo = _abastecendo;
+        System.out.println("abastecendo car"+idAuto + " recebe "+_abastecendo);
+    }
     
     public long getAcquisitionRate(){return acquisitionRate;}
 
@@ -196,7 +193,10 @@ public class Car extends Thread{
     
     public boolean theresNewRoute(){return theresNewRoute;}
 
-    public void ackNewRoute(){theresNewRoute = false;}
+    public void ackNewRoute(){
+        theresNewRoute = false;
+        System.out.println("ack newRoute " + idAuto);
+    }
 
     public synchronized void sincronizaWaitCar() throws InterruptedException{
 		synchronized (monitor){

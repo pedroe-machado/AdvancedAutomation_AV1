@@ -26,7 +26,7 @@ public abstract class Server extends Thread {
         while (!message.equals("STOP") && message != null) {
             try {
                 if (reader.available() > 0) {
-                    byte[] buffer = new byte[1024];
+                    byte[] buffer = new byte[2048];
                     int read = reader.read(buffer);
                     if (read > 0) {
                         message = new String(buffer, 0, read);
@@ -43,8 +43,7 @@ public abstract class Server extends Thread {
         try {
             byte[] jsonBytes = jsonObject.toString().getBytes();
             byte[] encryptedData = CryptoUtils.encrypt(CryptoUtils.getStaticKey(), CryptoUtils.getStaticIV(), jsonBytes); 
-            writer.write(encryptedData);
-            writer.write("MESSAGE RECEIVED".getBytes());
+            writer.write(jsonBytes);
             writer.flush();
         } catch (Exception e) {
             e.printStackTrace();

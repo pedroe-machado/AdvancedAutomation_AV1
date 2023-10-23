@@ -10,8 +10,7 @@ import org.json.JSONObject;
 
 import it.polito.appeal.traci.SumoTraciConnection;
 
-public class Driver extends Thread{
-    
+public class Driver extends Thread{  
     private String idDriver;
     private String idConta;
     private String senha;
@@ -23,13 +22,13 @@ public class Driver extends Thread{
     private ArrayList<Route> done;
 
     public Driver(SumoTraciConnection sumo, String id, Car _car){
-
         this.sumo = sumo;
         this.toDo = new ArrayList<>();
         this.done = new ArrayList<>(); 
         this.carro = _car;
         this.idDriver = this.idConta = this.senha = id;
     }
+
     @Override
     public void run() {
         while (carro.isAlive()) {
@@ -37,7 +36,7 @@ public class Driver extends Thread{
                 try {
                     done.add(Integer.parseInt(currentRoute.getId()), currentRoute); //adiciona rota finalizada
                     currentService.setOn(false);
-                } catch (Exception e) {}
+                } catch (Exception e) {System.out.println("nehuma rota finalizada");}
                 currentRoute = carro.getCurrenRoute();
                 carro.ackNewRoute();
                 try {
@@ -47,6 +46,7 @@ public class Driver extends Thread{
                 }
                 currentService = new TransportService(true, idConta, carro, sumo);
                 currentService.start();
+                System.out.println(idDriver + " iniciou nova rota: "+ currentRoute.getId());
             }
             while (!carro.doesNeedFuel() && !carro.theresNewRoute()) {
                 try {
@@ -70,30 +70,24 @@ public class Driver extends Thread{
         }
     }
     
-    private class BotPayment implements Runnable{        
-        private Socket socket;
+    private class BotPayment extends Thread {
+        private Client client;
         private JSONObject jsonObject;
 
         public BotPayment(String idDriver) throws UnknownHostException, IOException{
-            this.socket = new Socket("127.0.0.1", 20180);
+            this.client = new Client("127.0.0.1", 20180);
             this.jsonObject = new JSONObject();
             this.jsonObject.put("idConta", idConta);
             this.jsonObject.put("senha", senha);
             this.jsonObject.put("idBeneficiario", "FuelStation");
-            new Thread(this).start();
+            this.start();
         }
         @Override
         public void run() {
             try {
-                OutputStream output = socket.getOutputStream();
-                byte[] jsonBytes = jsonObject.toString().getBytes();
-
-                byte[] encryptedData = CryptoUtils.encrypt(CryptoUtils.getStaticKey(), CryptoUtils.getStaticIV(), jsonBytes);
-                output.write(encryptedData);
-
-                output.close();
-                socket.close();
+                client.SendMessage(jsonObject);
             } catch (Exception e) {
+                System.out.println("falha no pagamento da fuelStation");
                 e.printStackTrace();
             }
         }

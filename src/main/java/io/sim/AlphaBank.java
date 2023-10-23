@@ -25,32 +25,22 @@ import org.json.JSONObject;
  * ¹"valor"{"Double: valor a ser transferido"}
  * ¹ Drivers que transferirão todo seu dinheiro não adicionam chave "valor" 
 */
-public class AlphaBank implements Runnable{
-
+public class AlphaBank extends Service{
+    private Transferencia fuelStationConection;
     private HashMap<String, Account> accounts;
-    private ServerSocket serverSocket;
     
     public AlphaBank(ArrayList<String> users) throws UnknownHostException, IOException {
+        super(20180);
         accounts = new HashMap<>();
         for (String id : users) {
-            accounts.put(id, new Account(id, 0));
+            accounts.put(id, new Account(id, 1200));
         }
-        serverSocket = new ServerSocket(20180);
-        new Thread(this).start();
+        this.start();
     }
-
     @Override
-    public void run() {
-        while (true) {
-            try {
-                Socket clientSocket = serverSocket.accept(); // Aceita uma nova conexão
-                new Transferencia(clientSocket).start(); // Inicia uma nova thread para lidar com o cliente
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
+    public Server CreateServerThread(Socket conn){
+        return new Transferencia(conn);
     }
-
     public synchronized Account getAccount(String idConta, String senha) {
         Account conta = accounts.get(idConta);
         if (conta != null && conta.autenticar(senha)) {
@@ -58,53 +48,54 @@ public class AlphaBank implements Runnable{
         }
         return null;
     }
-
     public synchronized void transferePara(String idConta, double valor) {
         accounts.get(idConta).recebe(valor);
     }
 
-    private class Transferencia extends Thread{
+    private class Transferencia extends Server{
 
         private String idConta, senha;
         private String idBeneficiario;
         private double valor;
+        private Socket conn;
 
-        public Transferencia(Socket clientSocket) {
-            try {
-                InputStream input = clientSocket.getInputStream();
-                byte[] encryptedData = input.readAllBytes();
-                byte[] decryptedData = CryptoUtils.decrypt(CryptoUtils.getStaticKey(), CryptoUtils.getStaticIV(), encryptedData);
-
-                JSONObject dadosTranferencia = new JSONObject((new String(decryptedData)));
-
-                input.close();
-
-                this.idConta = (String) dadosTranferencia.get("idConta");
-                this.senha = (String) dadosTranferencia.get("senha");
-                this.idBeneficiario = (String) dadosTranferencia.get("idBeneficiario");
-                try {
-                    this.valor = (double) dadosTranferencia.get("valor");
-                } catch (JSONException e) {
-                    this.valor = getAccount(idConta, senha).getSaldo();   
-                }
-
-                clientSocket.close();
-
-            } catch (IOException e) {
-                e.printStackTrace();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+        public Transferencia(Socket conn) {
+            super(conn);
+            this.conn = conn;
         }
 
         @Override
-        public void run(){
-            getAccount(idConta, senha).debita(valor);
-            transferePara(idBeneficiario, valor);
+        protected void ProcessMessage(String jsonString) {
+            try {
+                if(jsonString.equals("fuelStation")){
+                    fuelStationConection = this;
+                } 
+
+                byte[] decryptedData = CryptoUtils.decrypt(CryptoUtils.getStaticKey(), CryptoUtils.getStaticIV(),jsonString.getBytes("UTF-8"));
+                JSONObject jsonObject = new JSONObject((new String(decryptedData)));
+
+                this.idConta = jsonObject.getString("idConta");
+                this.senha = jsonObject.getString("senha");
+                this.idBeneficiario = jsonObject.getString("idBeneficiario");
+                try {
+                    this.valor = jsonObject.getDouble("valor");
+                } catch (JSONException | NullPointerException e) {
+                    this.valor = getAccount(idConta, senha).getSaldo();
+                    if(fuelStationConection!=null){
+                        fuelStationConection.SendMessage(jsonObject);
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println("erroProcessMessage - AlphaBank");
+                this.valor = 0;
+            } finally {
+                getAccount(idConta, senha).debita(valor);
+                transferePara(idBeneficiario, valor);
+            }
         }
     }
-
-    private class Account{    
+    
+    private class Account{
         private String idConta;
         private String senha;
         private double saldo;
@@ -114,20 +105,16 @@ public class AlphaBank implements Runnable{
             this.idConta = this.senha = idConta;
             this.saldo = saldo;
         }
-    
         public synchronized double getSaldo(){
             return saldo;
         }
-    
         public synchronized void recebe(double valor){
             saldo += valor;
         }
-    
         public synchronized void debita(double valor){
             if(autenticado) saldo -= valor;
             else System.out.println("erro de autenticacao");
         }
-    
         public synchronized boolean autenticar(String _senha){
             if( _senha.equalsIgnoreCase(senha)){
                 autenticado = true;
