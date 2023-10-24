@@ -1,3 +1,7 @@
+Atividade Avaliativa - GAT108 - Automação Avançada
+Repositório do código submetido como resolução da primeira atividade avaliativa da disciplina.
+
+
 You need to install SUMO: https://eclipse.dev/sumo/
 
 You need to install Maven: https://maven.apache.org/
